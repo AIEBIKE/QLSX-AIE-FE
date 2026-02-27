@@ -29,6 +29,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import { useIsMobile } from "@/lib/useIsMobile";
 import { toast } from "sonner";
 import { useAuth } from "../../contexts/AuthContext";
 import * as api from "../../services/api";
@@ -74,6 +82,8 @@ export default function WorkerDashboard() {
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
   const [selectedProcess, setSelectedProcess] = useState("all");
+  const isMobile = useIsMobile();
+  const [mobileProcessSheet, setMobileProcessSheet] = useState<any>(null);
 
   useEffect(() => {
     loadData();
@@ -304,137 +314,337 @@ export default function WorkerDashboard() {
           <div>
             <div className="flex justify-between items-center mb-4 flex-wrap gap-3">
               <h4 className="text-lg font-bold">⚙️ Thao tác có thể đăng ký</h4>
-              <div className="flex gap-2 overflow-x-auto">
-                <Button
-                  variant={selectedProcess === "all" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedProcess("all")}
-                  className={
-                    selectedProcess === "all"
-                      ? "bg-[#0077c0] hover:bg-[#005f9e]"
-                      : ""
-                  }
-                >
-                  Tất cả
-                </Button>
-                {processes.map((p: any) => (
+              {/* Desktop: filter buttons */}
+              {!isMobile && (
+                <div className="flex gap-2 overflow-x-auto">
                   <Button
-                    key={p._id}
-                    variant={selectedProcess === p._id ? "default" : "outline"}
+                    variant={selectedProcess === "all" ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setSelectedProcess(p._id)}
+                    onClick={() => setSelectedProcess("all")}
                     className={
-                      selectedProcess === p._id
+                      selectedProcess === "all"
                         ? "bg-[#0077c0] hover:bg-[#005f9e]"
                         : ""
                     }
                   >
-                    {p.name}
+                    Tất cả
                   </Button>
-                ))}
-              </div>
+                  {processes.map((p: any) => (
+                    <Button
+                      key={p._id}
+                      variant={
+                        selectedProcess === p._id ? "default" : "outline"
+                      }
+                      size="sm"
+                      onClick={() => setSelectedProcess(p._id)}
+                      className={
+                        selectedProcess === p._id
+                          ? "bg-[#0077c0] hover:bg-[#005f9e]"
+                          : ""
+                      }
+                    >
+                      {p.name}
+                    </Button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {filteredOperations.length === 0 ? (
-              <Card className="border-slate-200">
-                <CardContent className="py-10 text-center text-slate-400">
-                  Không có thao tác khả dụng
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredOperations.map((op: any) => {
-                  const registered = isRegistered(op._id);
-                  const available = op.isAvailable;
-                  const isFull = !available && !registered;
-
-                  return (
-                    <Card
-                      key={op._id}
-                      className={`border-slate-200 ${isFull ? "opacity-60" : ""}`}
-                    >
-                      <CardContent className="pt-5">
-                        <div className="flex justify-between items-start mb-4">
-                          <div
-                            className={`w-10 h-10 rounded-lg flex items-center justify-center ${iconColorMap[getIconColorClass(op.processId?.name)] || "bg-blue-100 text-blue-600"}`}
-                          >
-                            {getOperationIcon(op.processId?.name)}
+            {/* Mobile: compact process list → tap to open sheet */}
+            {isMobile ? (
+              <div className="space-y-3">
+                {processes.length === 0 ? (
+                  <Card className="border-slate-200">
+                    <CardContent className="py-10 text-center text-slate-400">
+                      Không có thao tác khả dụng
+                    </CardContent>
+                  </Card>
+                ) : (
+                  processes.map((p: any) => {
+                    const processOps = operations.filter(
+                      (op: any) => op.processId?._id === p._id,
+                    );
+                    const availableCount = processOps.filter(
+                      (op: any) => op.isAvailable,
+                    ).length;
+                    const registeredCount = processOps.filter((op: any) =>
+                      isRegistered(op._id),
+                    ).length;
+                    return (
+                      <Card
+                        key={p._id}
+                        className="border-slate-200 cursor-pointer hover:shadow-md transition-shadow active:scale-[0.99]"
+                        onClick={() => setMobileProcessSheet(p)}
+                      >
+                        <CardContent className="py-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={`w-10 h-10 rounded-lg flex items-center justify-center ${iconColorMap[getIconColorClass(p.name)] || "bg-blue-100 text-blue-600"}`}
+                              >
+                                {getOperationIcon(p.name)}
+                              </div>
+                              <div>
+                                <div className="font-semibold">{p.name}</div>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-xs text-slate-500">
+                                    {processOps.length} thao tác
+                                  </span>
+                                  {registeredCount > 0 && (
+                                    <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-[10px] px-1.5">
+                                      ✓ {registeredCount} đã ĐK
+                                    </Badge>
+                                  )}
+                                  {availableCount > 0 && (
+                                    <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 text-[10px] px-1.5">
+                                      {availableCount} còn trống
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <ChevronRight className="w-5 h-5 text-slate-300" />
                           </div>
-                          <span className="text-xs text-slate-400">
-                            ID: {op.code}
-                          </span>
-                        </div>
-
-                        <div className="mb-4">
-                          <div className="font-semibold text-base mb-1">
-                            {op.name}
-                          </div>
-                          <span className="text-sm text-slate-500">
-                            {op.processId?.name}
-                          </span>
-                        </div>
-
-                        <div className="flex gap-6 mb-4">
-                          <div>
-                            <p className="text-[10px] uppercase text-slate-400 tracking-wider">
-                              Tiêu chuẩn
-                            </p>
-                            <p className="font-semibold text-[#0077c0]">
-                              {op.standardQuantity || "—"} sp/ca
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] uppercase text-slate-400 tracking-wider">
-                              Thời gian
-                            </p>
-                            <p className="font-semibold text-slate-600">
-                              {op.standardMinutes || "—"} min/sp
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mb-4 flex items-center gap-2">
-                          <Users
-                            className={`w-4 h-4 ${isFull ? "text-red-500" : "text-slate-400"}`}
-                          />
-                          <span
-                            className={`text-sm ${isFull ? "text-red-500" : "text-slate-500"}`}
-                          >
-                            {op.allowTeamwork
-                              ? `Người làm: ${op.currentWorkers}/${op.maxWorkers}${isFull ? " (Đã đủ)" : ""}`
-                              : op.currentWorkers > 0
-                                ? "1/1 (Có người)"
-                                : "0/1"}
-                          </span>
-                        </div>
-
-                        {registered ? (
-                          <Button
-                            className="w-full bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
-                            disabled
-                          >
-                            <CheckCircle className="w-4 h-4 mr-1" /> Đã đăng ký
-                          </Button>
-                        ) : available ? (
-                          <Button
-                            className="w-full bg-[#0077c0] hover:bg-[#005f9e]"
-                            onClick={() => handleRegister(op._id)}
-                            disabled={registering}
-                          >
-                            <ChevronRight className="w-4 h-4 mr-1" /> Đăng ký →
-                          </Button>
-                        ) : (
-                          <Button className="w-full" disabled variant="outline">
-                            Đã đủ người
-                          </Button>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                        </CardContent>
+                      </Card>
+                    );
+                  })
+                )}
               </div>
+            ) : (
+              /* Desktop: existing grid cards */
+              <>
+                {filteredOperations.length === 0 ? (
+                  <Card className="border-slate-200">
+                    <CardContent className="py-10 text-center text-slate-400">
+                      Không có thao tác khả dụng
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredOperations.map((op: any) => {
+                      const registered = isRegistered(op._id);
+                      const available = op.isAvailable;
+                      const isFull = !available && !registered;
+
+                      return (
+                        <Card
+                          key={op._id}
+                          className={`border-slate-200 ${isFull ? "opacity-60" : ""}`}
+                        >
+                          <CardContent className="pt-5">
+                            <div className="flex justify-between items-start mb-4">
+                              <div
+                                className={`w-10 h-10 rounded-lg flex items-center justify-center ${iconColorMap[getIconColorClass(op.processId?.name)] || "bg-blue-100 text-blue-600"}`}
+                              >
+                                {getOperationIcon(op.processId?.name)}
+                              </div>
+                              <span className="text-xs text-slate-400">
+                                ID: {op.code}
+                              </span>
+                            </div>
+
+                            <div className="mb-4">
+                              <div className="font-semibold text-base mb-1">
+                                {op.name}
+                              </div>
+                              <span className="text-sm text-slate-500">
+                                {op.processId?.name}
+                              </span>
+                            </div>
+
+                            <div className="flex gap-6 mb-4">
+                              <div>
+                                <p className="text-[10px] uppercase text-slate-400 tracking-wider">
+                                  Tiêu chuẩn
+                                </p>
+                                <p className="font-semibold text-[#0077c0]">
+                                  {op.standardQuantity || "—"} sp/ca
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] uppercase text-slate-400 tracking-wider">
+                                  Thời gian
+                                </p>
+                                <p className="font-semibold text-slate-600">
+                                  {op.standardMinutes || "—"} min/sp
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="mb-4 flex items-center gap-2">
+                              <Users
+                                className={`w-4 h-4 ${isFull ? "text-red-500" : "text-slate-400"}`}
+                              />
+                              <span
+                                className={`text-sm ${isFull ? "text-red-500" : "text-slate-500"}`}
+                              >
+                                {op.allowTeamwork
+                                  ? `Người làm: ${op.currentWorkers}/${op.maxWorkers}${isFull ? " (Đã đủ)" : ""}`
+                                  : op.currentWorkers > 0
+                                    ? "1/1 (Có người)"
+                                    : "0/1"}
+                              </span>
+                            </div>
+
+                            {registered ? (
+                              <Button
+                                className="w-full bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                                disabled
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" /> Đã đăng
+                                ký
+                              </Button>
+                            ) : available ? (
+                              <Button
+                                className="w-full bg-[#0077c0] hover:bg-[#005f9e]"
+                                onClick={() => handleRegister(op._id)}
+                                disabled={registering}
+                              >
+                                <ChevronRight className="w-4 h-4 mr-1" /> Đăng
+                                ký →
+                              </Button>
+                            ) : (
+                              <Button
+                                className="w-full"
+                                disabled
+                                variant="outline"
+                              >
+                                Đã đủ người
+                              </Button>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </div>
+
+          {/* Mobile Bottom Sheet - Operations by Process */}
+          <Sheet
+            open={!!mobileProcessSheet}
+            onOpenChange={(open) => {
+              if (!open) setMobileProcessSheet(null);
+            }}
+          >
+            <SheetContent
+              side="bottom"
+              className="max-h-[80vh] overflow-hidden flex flex-col rounded-t-2xl"
+            >
+              {mobileProcessSheet && (
+                <>
+                  <SheetHeader className="border-b border-slate-200 pb-3">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-10 h-10 rounded-lg flex items-center justify-center ${iconColorMap[getIconColorClass(mobileProcessSheet.name)] || "bg-blue-100 text-blue-600"}`}
+                      >
+                        {getOperationIcon(mobileProcessSheet.name)}
+                      </div>
+                      <div>
+                        <SheetTitle>{mobileProcessSheet.name}</SheetTitle>
+                        <SheetDescription>
+                          {
+                            operations.filter(
+                              (op: any) =>
+                                op.processId?._id === mobileProcessSheet._id,
+                            ).length
+                          }{" "}
+                          thao tác
+                        </SheetDescription>
+                      </div>
+                    </div>
+                  </SheetHeader>
+
+                  <div className="flex-1 overflow-y-auto py-3 space-y-3 px-1">
+                    {operations
+                      .filter(
+                        (op: any) =>
+                          op.processId?._id === mobileProcessSheet._id,
+                      )
+                      .map((op: any) => {
+                        const registered = isRegistered(op._id);
+                        const available = op.isAvailable;
+                        const isFull = !available && !registered;
+
+                        return (
+                          <div
+                            key={op._id}
+                            className={`border rounded-xl p-4 bg-white transition-shadow ${
+                              isFull
+                                ? "opacity-60 border-slate-100"
+                                : "border-slate-200 hover:shadow-sm"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3 mb-3">
+                              <div className="min-w-0">
+                                <div className="font-semibold text-sm">
+                                  {op.name}
+                                </div>
+                                <div className="flex items-center gap-3 mt-1">
+                                  <span className="text-xs text-[#0077c0] font-medium">
+                                    {op.standardQuantity || "—"} sp/ca
+                                  </span>
+                                  <span className="text-xs text-slate-400">
+                                    {op.standardMinutes || "—"} min/sp
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Users
+                                  className={`w-3.5 h-3.5 ${isFull ? "text-red-500" : "text-slate-400"}`}
+                                />
+                                <span
+                                  className={`text-xs ${isFull ? "text-red-500" : "text-slate-400"}`}
+                                >
+                                  {op.allowTeamwork
+                                    ? `${op.currentWorkers}/${op.maxWorkers}`
+                                    : op.currentWorkers > 0
+                                      ? "1/1"
+                                      : "0/1"}
+                                </span>
+                              </div>
+                            </div>
+
+                            {registered ? (
+                              <Button
+                                className="w-full bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                                size="sm"
+                                disabled
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" /> Đã đăng
+                                ký
+                              </Button>
+                            ) : available ? (
+                              <Button
+                                className="w-full bg-[#0077c0] hover:bg-[#005f9e]"
+                                size="sm"
+                                onClick={() => handleRegister(op._id)}
+                                disabled={registering}
+                              >
+                                <ChevronRight className="w-4 h-4 mr-1" /> Đăng
+                                ký thao tác này
+                              </Button>
+                            ) : (
+                              <Button
+                                className="w-full"
+                                size="sm"
+                                disabled
+                                variant="outline"
+                              >
+                                Đã đủ người
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </>
+              )}
+            </SheetContent>
+          </Sheet>
         </>
       )}
     </div>
