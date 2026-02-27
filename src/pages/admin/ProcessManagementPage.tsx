@@ -49,6 +49,14 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import { useIsMobile } from "@/lib/useIsMobile";
 import * as api from "../../services/api";
 
 export default function ProcessManagementPage() {
@@ -58,6 +66,8 @@ export default function ProcessManagementPage() {
   const [operations, setOperations] = useState<any[]>([]);
   const [selectedProcess, setSelectedProcess] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const isMobile = useIsMobile();
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
 
   // Modal states
   const [processModalOpen, setProcessModalOpen] = useState(false);
@@ -371,7 +381,10 @@ export default function ProcessManagementPage() {
                 processes.map((p, index) => (
                   <div
                     key={p._id}
-                    onClick={() => setSelectedProcess(p)}
+                    onClick={() => {
+                      setSelectedProcess(p);
+                      if (isMobile) setMobileSheetOpen(true);
+                    }}
                     className={`px-5 py-4 cursor-pointer border-l-[3px] transition-all ${
                       selectedProcess?._id === p._id
                         ? "border-l-[#0077c0] bg-[#0077c0]/5"
@@ -448,129 +461,224 @@ export default function ProcessManagementPage() {
             </div>
           </Card>
 
-          {/* Right Panel - Operations */}
-          <Card className="border-slate-200 overflow-hidden">
-            {selectedProcess ? (
-              <>
-                <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center flex-wrap gap-3">
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-lg font-bold">
-                        Thao tác {selectedProcess.name}
-                      </h3>
-                      <Badge className="bg-emerald-100 text-emerald-700">
-                        Đang hoạt động
-                      </Badge>
+          {/* Right Panel - Operations (Desktop only) */}
+          {!isMobile && (
+            <Card className="border-slate-200 overflow-hidden">
+              {selectedProcess ? (
+                <>
+                  <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center flex-wrap gap-3">
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-lg font-bold">
+                          Thao tác {selectedProcess.name}
+                        </h3>
+                        <Badge className="bg-emerald-100 text-emerald-700">
+                          Đang hoạt động
+                        </Badge>
+                      </div>
+                      <div className="flex gap-4 mt-1.5">
+                        <span className="text-xs text-slate-500 flex items-center gap-1">
+                          <Wrench className="w-3 h-3" /> {totalOperations} Bước
+                        </span>
+                        <span className="text-xs text-slate-500 flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> {Math.round(totalTime)}{" "}
+                          phút
+                        </span>
+                        <span className="text-xs text-slate-500 flex items-center gap-1">
+                          <Users className="w-3 h-3" /> {totalWorkers} KTV
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex gap-4 mt-1.5">
-                      <span className="text-xs text-slate-500 flex items-center gap-1">
-                        <Wrench className="w-3 h-3" /> {totalOperations} Bước
+                    <Button
+                      onClick={() => openOperationModal()}
+                      className="bg-[#0077c0] hover:bg-[#005fa3]"
+                    >
+                      <Plus className="w-4 h-4 mr-1" /> Thêm thao tác
+                    </Button>
+                  </div>
+
+                  <div className="px-6 overflow-x-auto">
+                    {operations.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                        <Wrench className="w-8 h-8 mb-2" />
+                        <p className="text-sm">Chưa có thao tác</p>
+                      </div>
+                    ) : (
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-left">
+                            <th className="py-3 w-10 text-slate-500 font-medium">
+                              #
+                            </th>
+                            <th className="py-3 text-slate-500 font-medium">
+                              TÊN THAO TÁC
+                            </th>
+                            <th className="py-3 text-center text-slate-500 font-medium">
+                              TIÊU CHUẨN
+                            </th>
+                            <th className="py-3 text-center text-slate-500 font-medium">
+                              ĐỘ KHÓ
+                            </th>
+                            <th className="py-3 w-14"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {operations.map((op, index) => (
+                            <tr
+                              key={op._id}
+                              className="border-b border-slate-100 hover:bg-slate-50 transition-colors"
+                            >
+                              <td className="py-3">
+                                <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-medium">
+                                  {index + 1}
+                                </div>
+                              </td>
+                              <td className="py-3">
+                                <div className="font-medium">{op.name}</div>
+                                <span className="text-xs text-slate-400">
+                                  {op.description || `ID: ${op.code}`}
+                                </span>
+                              </td>
+                              <td className="py-3 text-center">
+                                <Badge
+                                  variant="outline"
+                                  className="bg-blue-50 text-blue-700 border-blue-200"
+                                >
+                                  {op.standardQuantity || "—"} sp/giờ
+                                </Badge>
+                              </td>
+                              <td className="py-3 text-center">
+                                <DifficultyStars value={op.difficulty || 3} />
+                              </td>
+                              <td className="py-3">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => openOperationModal(op)}
+                                >
+                                  <Settings className="w-4 h-4" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+
+                  {operations.length > 0 && (
+                    <div className="px-6 py-3 border-t border-slate-200 flex justify-between items-center text-sm text-slate-500">
+                      <span>
+                        Hiển thị {operations.length} / {operations.length} thao
+                        tác
                       </span>
-                      <span className="text-xs text-slate-500 flex items-center gap-1">
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-[400px] text-slate-400">
+                  <Wrench className="w-10 h-10 mb-3" />
+                  <p className="text-sm">Chọn công đoạn để xem thao tác</p>
+                </div>
+              )}
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Mobile Bottom Sheet - Operations */}
+      <Sheet open={mobileSheetOpen} onOpenChange={setMobileSheetOpen}>
+        <SheetContent
+          side="bottom"
+          className="max-h-[80vh] overflow-hidden flex flex-col rounded-t-2xl"
+        >
+          {selectedProcess && (
+            <>
+              <SheetHeader className="border-b border-slate-200 pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <SheetTitle className="text-lg">
+                      {selectedProcess.name}
+                    </SheetTitle>
+                    <SheetDescription className="flex gap-3 mt-1">
+                      <span className="flex items-center gap-1">
+                        <Wrench className="w-3 h-3" /> {totalOperations} bước
+                      </span>
+                      <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" /> {Math.round(totalTime)}{" "}
                         phút
                       </span>
-                      <span className="text-xs text-slate-500 flex items-center gap-1">
+                      <span className="flex items-center gap-1">
                         <Users className="w-3 h-3" /> {totalWorkers} KTV
                       </span>
-                    </div>
+                    </SheetDescription>
                   </div>
                   <Button
+                    size="sm"
                     onClick={() => openOperationModal()}
                     className="bg-[#0077c0] hover:bg-[#005fa3]"
                   >
-                    <Plus className="w-4 h-4 mr-1" /> Thêm thao tác
+                    <Plus className="w-4 h-4 mr-1" /> Thêm
                   </Button>
                 </div>
+              </SheetHeader>
 
-                <div className="px-6 overflow-x-auto">
-                  {operations.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                      <Wrench className="w-8 h-8 mb-2" />
-                      <p className="text-sm">Chưa có thao tác</p>
-                    </div>
-                  ) : (
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-slate-200 text-left">
-                          <th className="py-3 w-10 text-slate-500 font-medium">
-                            #
-                          </th>
-                          <th className="py-3 text-slate-500 font-medium">
-                            TÊN THAO TÁC
-                          </th>
-                          <th className="py-3 text-center text-slate-500 font-medium">
-                            TIÊU CHUẨN
-                          </th>
-                          <th className="py-3 text-center text-slate-500 font-medium">
-                            ĐỘ KHÓ
-                          </th>
-                          <th className="py-3 w-14"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {operations.map((op, index) => (
-                          <tr
-                            key={op._id}
-                            className="border-b border-slate-100 hover:bg-slate-50 transition-colors"
-                          >
-                            <td className="py-3">
-                              <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-medium">
-                                {index + 1}
-                              </div>
-                            </td>
-                            <td className="py-3">
-                              <div className="font-medium">{op.name}</div>
-                              <span className="text-xs text-slate-400">
-                                {op.description || `ID: ${op.code}`}
-                              </span>
-                            </td>
-                            <td className="py-3 text-center">
+              <div className="flex-1 overflow-y-auto py-3 space-y-3 px-1">
+                {operations.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                    <Wrench className="w-8 h-8 mb-2" />
+                    <p className="text-sm">Chưa có thao tác</p>
+                  </div>
+                ) : (
+                  operations.map((op, index) => (
+                    <div
+                      key={op._id}
+                      className="border border-slate-200 rounded-xl p-4 bg-white hover:shadow-sm transition-shadow"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <div className="w-7 h-7 rounded-full bg-[#0077c0]/10 text-[#0077c0] flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                            {index + 1}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-sm truncate">
+                              {op.name}
+                            </div>
+                            <div className="text-xs text-slate-400 mt-0.5">
+                              {op.description || `Mã: ${op.code}`}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 mt-2">
                               <Badge
                                 variant="outline"
-                                className="bg-blue-50 text-blue-700 border-blue-200"
+                                className="bg-blue-50 text-blue-700 border-blue-200 text-xs"
                               >
                                 {op.standardQuantity || "—"} sp/giờ
                               </Badge>
-                            </td>
-                            <td className="py-3 text-center">
                               <DifficultyStars value={op.difficulty || 3} />
-                            </td>
-                            <td className="py-3">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => openOperationModal(op)}
-                              >
-                                <Settings className="w-4 h-4" />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-
-                {operations.length > 0 && (
-                  <div className="px-6 py-3 border-t border-slate-200 flex justify-between items-center text-sm text-slate-500">
-                    <span>
-                      Hiển thị {operations.length} / {operations.length} thao
-                      tác
-                    </span>
-                  </div>
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          onClick={() => {
+                            setMobileSheetOpen(false);
+                            setTimeout(() => openOperationModal(op), 300);
+                          }}
+                        >
+                          <Settings className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
                 )}
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-[400px] text-slate-400">
-                <Wrench className="w-10 h-10 mb-3" />
-                <p className="text-sm">Chọn công đoạn để xem thao tác</p>
               </div>
-            )}
-          </Card>
-        </div>
-      )}
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
 
       {/* Process Modal */}
       <Dialog
