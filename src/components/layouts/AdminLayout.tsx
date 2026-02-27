@@ -1,0 +1,461 @@
+import { useState, useEffect, ReactNode } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import {
+  LayoutDashboard,
+  Car,
+  GitBranch,
+  BarChart3,
+  FileText,
+  Wrench,
+  Users,
+  LogOut,
+  PanelLeftClose,
+  PanelLeft,
+  Menu,
+  Bell,
+  ChevronDown,
+  Wallet,
+  User,
+  MoreVertical,
+  BadgeCheck,
+  CreditCard,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+  DropdownMenuGroup,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from "../../contexts/AuthContext";
+import * as api from "../../services/api";
+
+interface MenuItem {
+  key: string;
+  icon: ReactNode;
+  label: string;
+  divider?: boolean;
+}
+
+const menuItems: MenuItem[] = [
+  {
+    key: "/admin",
+    icon: <LayoutDashboard className="w-4 h-4" />,
+    label: "Dashboard",
+  },
+  {
+    key: "/admin/vehicle-types",
+    icon: <Car className="w-4 h-4" />,
+    label: "Loại xe",
+  },
+  {
+    key: "/admin/processes",
+    icon: <GitBranch className="w-4 h-4" />,
+    label: "Công đoạn & Thao tác",
+  },
+  {
+    key: "/admin/standards",
+    icon: <BarChart3 className="w-4 h-4" />,
+    label: "Định mức sản xuất",
+  },
+  {
+    key: "/admin/orders",
+    icon: <FileText className="w-4 h-4" />,
+    label: "Lệnh sản xuất",
+  },
+  {
+    key: "/admin/registrations",
+    icon: <Wrench className="w-4 h-4" />,
+    label: "Đăng ký công",
+  },
+  {
+    key: "/admin/salary-summary",
+    icon: <Wallet className="w-4 h-4" />,
+    label: "💰 Tổng hợp lương",
+  },
+  {
+    key: "/admin/users",
+    icon: <Users className="w-4 h-4" />,
+    label: "Quản lý người dùng",
+  },
+];
+
+const extraMenuItems: MenuItem[] = [
+  {
+    key: "/worker",
+    icon: <User className="w-4 h-4" />,
+    label: "Giao diện Công nhân",
+  },
+];
+
+interface AdminLayoutProps {
+  children: ReactNode;
+}
+
+export default function AdminLayout({ children }: AdminLayoutProps) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Fetch pending users count
+  const { data: pendingData } = useQuery({
+    queryKey: ["pendingUsersCount"],
+    queryFn: async () => {
+      const res = await api.default.get("/auth/users/pending");
+      return res.data;
+    },
+    refetchInterval: 30000,
+  });
+  const pendingCount = pendingData?.count || 0;
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+      if (window.innerWidth >= 768) {
+        setMobileOpen(false);
+      }
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  const handleMenuClick = (key: string) => {
+    navigate(key);
+    if (isMobile) setMobileOpen(false);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
+
+  const getInitials = (name: string) => {
+    if (!name) return "?";
+    const parts = name.split(" ");
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name[0].toUpperCase();
+  };
+
+  const siderWidth = collapsed ? 64 : 220;
+
+  const NavItem = ({ item }: { item: MenuItem }) => {
+    const isActive = location.pathname === item.key;
+    return (
+      <button
+        onClick={() => handleMenuClick(item.key)}
+        className={`
+          w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+          transition-all duration-200 cursor-pointer
+          ${
+            isActive
+              ? "bg-[#0077c0] text-white shadow-md"
+              : "text-slate-300 hover:bg-white/10 hover:text-white"
+          }
+          ${collapsed && !isMobile ? "justify-center px-2" : ""}
+        `}
+        title={collapsed && !isMobile ? item.label : undefined}
+      >
+        {item.icon}
+        {!(collapsed && !isMobile) && (
+          <span className="truncate">{item.label}</span>
+        )}
+      </button>
+    );
+  };
+
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="h-16 flex items-center justify-center bg-white/10 border-b border-white/10">
+        <span className="text-white font-bold text-base">
+          {collapsed && !isMobile ? "🔋" : "🔋 AI EBIKE"}
+        </span>
+      </div>
+
+      {/* Menu Items */}
+      <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+        {menuItems.map((item) => (
+          <NavItem key={item.key} item={item} />
+        ))}
+
+        {/* Divider */}
+        <div className="my-2 border-t border-white/10" />
+
+        {extraMenuItems.map((item) => (
+          <NavItem key={item.key} item={item} />
+        ))}
+      </nav>
+
+      {/* User Profile Section at bottom */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className={`
+              flex items-center gap-3 border-t border-white/10 cursor-pointer
+              hover:bg-white/10 transition-colors duration-200
+              ${collapsed && !isMobile ? "p-2 justify-center" : "px-4 py-3"}
+            `}
+          >
+            <Avatar
+              className={`${collapsed && !isMobile ? "w-8 h-8" : "w-10 h-10"} shrink-0`}
+            >
+              <AvatarFallback className="bg-[#0077c0] text-white text-sm font-semibold">
+                {getInitials(user?.name || "")}
+              </AvatarFallback>
+            </Avatar>
+            {!(collapsed && !isMobile) && (
+              <>
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="text-white font-semibold text-sm truncate">
+                    {user?.name}
+                  </div>
+                  <div className="text-white/60 text-xs truncate">
+                    {user?.code} •{" "}
+                    {user?.role === "admin" ? "Quản trị viên" : "Giám sát"}
+                  </div>
+                </div>
+                <MoreVertical className="w-4 h-4 text-white/60" />
+              </>
+            )}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+          side={isMobile ? "bottom" : "right"}
+          align="end"
+          sideOffset={4}
+        >
+          <DropdownMenuLabel className="p-0 font-normal">
+            <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+              <Avatar className="h-8 w-8 rounded-lg">
+                <AvatarFallback className="rounded-lg bg-[#0077c0] text-white text-xs font-semibold">
+                  {getInitials(user?.name || "")}
+                </AvatarFallback>
+              </Avatar>
+              <div className="grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-medium">{user?.name}</span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {user?.code} •{" "}
+                  {user?.role === "admin" ? "Quản trị viên" : "Giám sát"}
+                </span>
+              </div>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuItem onClick={() => navigate("/admin/account")}>
+              <BadgeCheck className="w-4 h-4 mr-2" />
+              Tài khoản
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/admin/salary-summary")}>
+              <CreditCard className="w-4 h-4 mr-2" />
+              Tổng hợp lương
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => navigate("/admin/users?tab=pending")}
+            >
+              <Bell className="w-4 h-4 mr-2" />
+              Thông báo
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={handleLogout}
+            className="text-red-600 focus:text-red-600"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Đăng xuất
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+
+  return (
+    <TooltipProvider>
+      <div className="min-h-screen flex bg-slate-50">
+        {/* Desktop Sidebar */}
+        {!isMobile && (
+          <aside
+            className="fixed left-0 top-0 bottom-0 z-30 overflow-hidden transition-all duration-200"
+            style={{
+              width: siderWidth,
+              background: "linear-gradient(180deg, #0d1b2a 0%, #1a2e44 100%)",
+            }}
+          >
+            <SidebarContent />
+          </aside>
+        )}
+
+        {/* Mobile Sheet */}
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+          <SheetContent
+            side="left"
+            className="p-0 w-[220px] border-0"
+            style={{
+              background: "linear-gradient(180deg, #0d1b2a 0%, #1a2e44 100%)",
+            }}
+          >
+            <SidebarContent />
+          </SheetContent>
+        </Sheet>
+
+        {/* Main Content */}
+        <div
+          className="flex-1 flex flex-col transition-all duration-200"
+          style={{ marginLeft: isMobile ? 0 : siderWidth }}
+        >
+          {/* Header */}
+          <header className="sticky top-0 z-20 h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 shadow-sm">
+            {/* Left side - Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() =>
+                isMobile ? setMobileOpen(true) : setCollapsed(!collapsed)
+              }
+              className="h-10 w-10"
+            >
+              {isMobile ? (
+                <Menu className="w-5 h-5" />
+              ) : collapsed ? (
+                <PanelLeft className="w-5 h-5" />
+              ) : (
+                <PanelLeftClose className="w-5 h-5" />
+              )}
+            </Button>
+
+            {/* Right side */}
+            <div className="flex items-center gap-3">
+              {/* Notification Bell */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={pendingCount > 0 ? "default" : "ghost"}
+                    size="icon"
+                    className={`relative h-10 w-10 ${
+                      pendingCount > 0
+                        ? "bg-amber-500 hover:bg-amber-600 text-white animate-pulse"
+                        : ""
+                    }`}
+                    onClick={() => navigate("/admin/users?tab=pending")}
+                  >
+                    <Bell className="w-5 h-5" />
+                    {pendingCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                        {pendingCount}
+                      </span>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {pendingCount > 0
+                    ? `${pendingCount} tài khoản chờ duyệt`
+                    : "Không có thông báo"}
+                </TooltipContent>
+              </Tooltip>
+
+              {/* User Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                    <Avatar className="w-9 h-9">
+                      <AvatarFallback className="bg-[#0077c0] text-white text-sm font-semibold">
+                        {getInitials(user?.name || "")}
+                      </AvatarFallback>
+                    </Avatar>
+                    {!isMobile && (
+                      <div className="flex items-center gap-1">
+                        <span className="font-semibold text-sm text-slate-700">
+                          {user?.name}
+                        </span>
+                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                      </div>
+                    )}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 rounded-lg">
+                  <DropdownMenuLabel className="p-0 font-normal">
+                    <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                      <Avatar className="h-8 w-8 rounded-lg">
+                        <AvatarFallback className="rounded-lg bg-[#0077c0] text-white text-xs font-semibold">
+                          {getInitials(user?.name || "")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="grid flex-1 text-left text-sm leading-tight">
+                        <span className="truncate font-medium">
+                          {user?.name}
+                        </span>
+                        <span className="truncate text-xs text-muted-foreground">
+                          {user?.code} •{" "}
+                          {user?.role === "admin"
+                            ? "Quản trị viên"
+                            : "Giám sát"}
+                        </span>
+                      </div>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      onClick={() => navigate("/admin/account")}
+                    >
+                      <BadgeCheck className="w-4 h-4 mr-2" />
+                      Tài khoản
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => navigate("/admin/salary-summary")}
+                    >
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Tổng hợp lương
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => navigate("/admin/users?tab=pending")}
+                    >
+                      <Bell className="w-4 h-4 mr-2" />
+                      Thông báo
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="text-red-600 focus:text-red-600"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Đăng xuất
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </header>
+
+          {/* Page Content */}
+          <main className="flex-1 p-4 md:p-6">
+            <div className="bg-white rounded-xl p-4 md:p-6 min-h-[calc(100vh-120px)] shadow-sm border border-slate-100">
+              {children}
+            </div>
+          </main>
+        </div>
+      </div>
+    </TooltipProvider>
+  );
+}
