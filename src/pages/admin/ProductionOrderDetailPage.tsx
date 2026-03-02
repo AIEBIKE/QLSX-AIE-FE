@@ -5,6 +5,8 @@ import dayjs from "dayjs";
 import {
   CheckCircle,
   UserPlus,
+  Clock,
+  AlertCircle,
   FileText,
   RefreshCw,
   AlertTriangle,
@@ -87,6 +89,7 @@ const getIconColor = (processName = "") => {
 };
 
 const statusMap: Record<string, { cls: string; label: string }> = {
+  registered: { cls: "bg-cyan-100 text-cyan-700", label: "Đăng ký" },
   pending: { cls: "bg-slate-100 text-slate-600", label: "Chờ" },
   in_progress: { cls: "bg-blue-100 text-blue-700", label: "Đang thực hiện" },
   completed: { cls: "bg-emerald-100 text-emerald-700", label: "Hoàn thành" },
@@ -106,6 +109,7 @@ export default function ProductionOrderDetailPage() {
   const [compCheck, setCompCheck] = useState<any>(null);
   const [forceOpen, setForceOpen] = useState(false);
   const [forceMsg, setForceMsg] = useState("");
+  const [detailProcess, setDetailProcess] = useState<any>(null);
   const [assignForm, setAssignForm] = useState({
     userId: "",
     operationId: "",
@@ -410,7 +414,12 @@ export default function ProductionOrderDetailPage() {
                         </Badge>
                       </td>
                       <td className="py-3 text-center">
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setDetailProcess(r)}
+                        >
                           <Eye className="w-4 h-4" />
                         </Button>
                       </td>
@@ -575,6 +584,154 @@ export default function ProductionOrderDetailPage() {
               Bổ sung
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Process Detail Dialog */}
+      <Dialog
+        open={!!detailProcess}
+        onOpenChange={(o) => {
+          if (!o) setDetailProcess(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Chi tiết: {detailProcess?.processName}
+              <Badge
+                variant="outline"
+                className={statusMap[detailProcess?.status]?.cls || ""}
+              >
+                {statusMap[detailProcess?.status]?.label ||
+                  detailProcess?.status}
+              </Badge>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div className="flex gap-4 text-sm text-slate-500">
+              <span>
+                Hoàn thành:{" "}
+                <strong className="text-slate-800">
+                  {detailProcess?.completed}/{detailProcess?.required}
+                </strong>
+              </span>
+              <span>
+                Đăng ký:{" "}
+                <strong className="text-slate-800">
+                  {detailProcess?.registrations}
+                </strong>
+              </span>
+            </div>
+            {detailProcess?.registrationDetails?.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                Chưa có đăng ký nào
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {(detailProcess?.registrationDetails || []).map(
+                  (reg: any, i: number) => (
+                    <div
+                      key={reg._id || i}
+                      className="border border-slate-200 rounded-lg p-3 space-y-2"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-medium text-sm">
+                            {reg.worker?.code} - {reg.worker?.name}
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            {reg.operation?.name}
+                          </div>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={
+                            statusMap[reg.status]?.cls ||
+                            "bg-slate-100 text-slate-600"
+                          }
+                        >
+                          {statusMap[reg.status]?.label || reg.status}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                        <div>
+                          <span className="text-slate-400">SL kỳ vọng</span>
+                          <div className="font-semibold">
+                            {reg.expectedQuantity}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">SL thực tế</span>
+                          <div className="font-semibold">
+                            {reg.actualQuantity ?? "-"}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Chênh lệch</span>
+                          <div
+                            className={`font-semibold ${(reg.deviation || 0) > 0 ? "text-emerald-600" : (reg.deviation || 0) < 0 ? "text-red-500" : ""}`}
+                          >
+                            {reg.deviation != null
+                              ? reg.deviation > 0
+                                ? `+${reg.deviation}`
+                                : reg.deviation
+                              : "-"}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Thời gian</span>
+                          <div className="font-semibold flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {reg.workingMinutes > 0
+                              ? `${reg.workingMinutes} phút`
+                              : "-"}
+                          </div>
+                        </div>
+                      </div>
+                      {(reg.interruptionMinutes > 0 ||
+                        reg.interruptionNote) && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-md p-2 flex items-start gap-2 text-xs">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
+                          <div>
+                            <span className="font-medium text-amber-700">
+                              Gián đoạn: {reg.interruptionMinutes} phút
+                            </span>
+                            {reg.interruptionNote && (
+                              <p className="text-amber-600 mt-0.5">
+                                Lý do: {reg.interruptionNote}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {(reg.bonusAmount > 0 || reg.penaltyAmount > 0) && (
+                        <div className="flex gap-3 text-xs">
+                          {reg.bonusAmount > 0 && (
+                            <span className="text-emerald-600 font-medium">
+                              +
+                              {new Intl.NumberFormat("vi-VN").format(
+                                reg.bonusAmount,
+                              )}
+                              đ thưởng
+                            </span>
+                          )}
+                          {reg.penaltyAmount > 0 && (
+                            <span className="text-red-500 font-medium">
+                              -
+                              {new Intl.NumberFormat("vi-VN").format(
+                                reg.penaltyAmount,
+                              )}
+                              đ phạt
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ),
+                )}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
