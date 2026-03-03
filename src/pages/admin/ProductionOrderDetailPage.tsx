@@ -241,7 +241,9 @@ export default function ProductionOrderDetailPage() {
           <div className="flex justify-between items-start mb-6 flex-wrap gap-4">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <h2 className="text-2xl font-bold">Lệnh #{order?.orderCode}</h2>
+                <h2 className="text-lg sm:text-2xl font-bold">
+                  Lệnh #{order?.orderCode}
+                </h2>
                 <Badge
                   variant="outline"
                   className={statusMap[order?.status]?.cls || ""}
@@ -332,7 +334,74 @@ export default function ProductionOrderDetailPage() {
               </span>
             </div>
           )}
-          <div className="overflow-x-auto">
+          {/* Mobile: Card layout */}
+          <div className="md:hidden space-y-3">
+            {progress.map((r) => {
+              const ic = getIconColor(r.processName);
+              const st = statusMap[r.status] || { cls: "", label: r.status };
+              return (
+                <div
+                  key={r.processId}
+                  className="border border-slate-200 rounded-lg p-3 space-y-2.5"
+                  onClick={() => setDetailProcess(r)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className={`w-9 h-9 rounded-lg ${ic.bg} ${ic.text} flex items-center justify-center shrink-0`}
+                      >
+                        {getProcessIcon(r.processName)}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-sm">
+                          {r.processName}
+                        </div>
+                        <span className="text-xs text-slate-400">
+                          Bước {r.order}
+                        </span>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className={st.cls}>
+                      {st.label}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${r.status === "completed" ? "bg-emerald-500" : "bg-[#0077c0]"}`}
+                        style={{ width: `${Math.min(r.percentage, 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-semibold min-w-[45px] text-right">
+                      {r.percentage}%
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>
+                      {r.completed}/{r.required} SP
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {r.workers.length === 0 ? (
+                        <span className="text-slate-400">Chưa phân công</span>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <Avatar className="h-5 w-5">
+                            <AvatarFallback className="bg-[#0077c0] text-white text-[10px]">
+                              {r.workers[0]?.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span>{r.workers[0]}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop: Table layout */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left">
@@ -430,16 +499,23 @@ export default function ProductionOrderDetailPage() {
             </table>
           </div>
           {order?.status === "in_progress" && (
-            <div className="flex gap-3 mt-5 pt-5 border-t">
-              <Button variant="outline" onClick={loadData}>
+            <div className="flex flex-wrap gap-3 mt-5 pt-5 border-t">
+              <Button variant="outline" size="sm" onClick={loadData}>
                 <RefreshCw className="w-4 h-4 mr-1" /> Làm mới
               </Button>
-              <Button variant="outline" onClick={handleCheckCompletion}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCheckCompletion}
+              >
                 <AlertTriangle className="w-4 h-4 mr-1" /> Kiểm tra
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button className="bg-emerald-500 hover:bg-emerald-600">
+                  <Button
+                    size="sm"
+                    className="bg-emerald-500 hover:bg-emerald-600"
+                  >
                     <CheckCircle className="w-4 h-4 mr-1" /> Hoàn thành
                   </Button>
                 </AlertDialogTrigger>

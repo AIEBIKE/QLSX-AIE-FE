@@ -16,7 +16,6 @@ import {
   Bell,
   ChevronDown,
   Wallet,
-  User,
   MoreVertical,
   BadgeCheck,
   CreditCard,
@@ -90,14 +89,6 @@ const menuItems: MenuItem[] = [
     key: "/admin/users",
     icon: <Users className="w-4 h-4" />,
     label: "Quản lý người dùng",
-  },
-];
-
-const extraMenuItems: MenuItem[] = [
-  {
-    key: "/worker",
-    icon: <User className="w-4 h-4" />,
-    label: "Giao diện Công nhân",
   },
 ];
 
@@ -194,13 +185,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       {/* Menu Items */}
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         {menuItems.map((item) => (
-          <NavItem key={item.key} item={item} />
-        ))}
-
-        {/* Divider */}
-        <div className="my-2 border-t border-white/10" />
-
-        {extraMenuItems.map((item) => (
           <NavItem key={item.key} item={item} />
         ))}
       </nav>

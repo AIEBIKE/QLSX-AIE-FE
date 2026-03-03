@@ -71,6 +71,7 @@ export default function AdminDashboard() {
       value: stats.vehicleTypes,
       icon: <Car className="w-5 h-5" />,
       gradient: "from-violet-500 to-purple-700",
+      link: "/admin/vehicle-types",
     },
     {
       label: "Lệnh SX Active",
@@ -78,18 +79,21 @@ export default function AdminDashboard() {
       icon: <FileText className="w-5 h-5" />,
       gradient: "from-pink-500 to-rose-600",
       small: !stats.activeOrder,
+      link: "/admin/orders",
     },
     {
       label: "Đăng ký hôm nay",
       value: stats.todayRegistrations,
       icon: <Users className="w-5 h-5" />,
       gradient: "from-sky-400 to-cyan-500",
+      link: "/admin/registrations",
     },
     {
       label: "Đã hoàn thành",
       value: stats.completedRegistrations,
       icon: <CheckCircle className="w-5 h-5" />,
       gradient: "from-emerald-400 to-teal-500",
+      link: "/admin/registrations",
     },
   ];
 
@@ -114,7 +118,8 @@ export default function AdminDashboard() {
         {statCards.map((stat, i) => (
           <div
             key={i}
-            className={`rounded-xl bg-gradient-to-br ${stat.gradient} p-5 text-white shadow-lg`}
+            className={`rounded-xl bg-gradient-to-br ${stat.gradient} p-5 text-white shadow-lg cursor-pointer hover:scale-[1.03] hover:shadow-xl transition-all duration-200`}
+            onClick={() => navigate(stat.link)}
           >
             <div className="flex items-center justify-between mb-3">
               <span className="text-white/80 text-sm font-medium">
@@ -131,7 +136,10 @@ export default function AdminDashboard() {
 
       {/* Active Order Details */}
       {stats.activeOrder && (
-        <Card className="mb-6 border-slate-200">
+        <Card
+          className="mb-6 border-slate-200 cursor-pointer hover:shadow-md transition-shadow duration-200"
+          onClick={() => navigate(`/admin/orders/${stats.activeOrder._id}`)}
+        >
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">
               📋 Lệnh sản xuất đang thực hiện
