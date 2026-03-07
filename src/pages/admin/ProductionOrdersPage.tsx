@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import Cookies from "js-cookie";
 import dayjs from "dayjs";
 import {
   Plus,
@@ -86,7 +87,7 @@ export default function ProductionOrdersPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [factories, setFactories] = useState<any[]>([]);
   const [selectedFactory, setSelectedFactory] = useState<string>("all");
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const user = JSON.parse(Cookies.get("user") || "{}");
   const roleCode = user.roleCode || user.role;
   const isAdmin = roleCode === "ADMIN" || roleCode === "admin";
   const isFacManager = roleCode === "FAC_MANAGER" || roleCode === "fac_manager";

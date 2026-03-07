@@ -6,9 +6,15 @@
  */
 
 import axios from "axios";
+import Cookies from "js-cookie";
 
 // Base API URL
 const API_URL = `${import.meta.env.VITE_API_URL || "/api"}/auth`;
+
+// Configure axios for credentials
+const authAxios = axios.create({
+  withCredentials: true,
+});
 
 // Types
 export interface LoginCredentials {
@@ -23,20 +29,6 @@ export interface RegisterData {
   password: string;
   role?: "worker" | "supervisor" | "admin" | "fac_manager";
 }
-
-/**
- * Lấy mã nhân viên tiếp theo theo vai trò
- */
-export const getNextCodeApi = async (
-  role: string,
-): Promise<{
-  success: boolean;
-  data?: { code: string };
-  error?: { message: string };
-}> => {
-  const response = await axios.get(`${API_URL}/next-code/${role}`);
-  return response.data;
-};
 
 export interface AuthResponse {
   success: boolean;
@@ -67,14 +59,28 @@ export interface ResetPasswordData {
 }
 
 /**
+ * Lấy mã nhân viên tiếp theo theo vai trò
+ */
+export const getNextCodeApi = async (
+  role: string,
+): Promise<{
+  success: boolean;
+  data?: { code: string };
+  error?: { message: string };
+}> => {
+  const response = await authAxios.get(`${API_URL}/next-code/${role}`);
+  return response.data;
+};
+
+/**
  * Đăng nhập
  */
 export const loginApi = async (
   credentials: LoginCredentials,
 ): Promise<AuthResponse> => {
-  const response = await axios.post<AuthResponse>(
+  const response = await authAxios.post<AuthResponse>(
     `${API_URL}/login`,
-    credentials,
+    credentials
   );
   return response.data;
 };
@@ -85,7 +91,7 @@ export const loginApi = async (
 export const registerApi = async (
   data: RegisterData,
 ): Promise<AuthResponse> => {
-  const response = await axios.post<AuthResponse>(`${API_URL}/register`, data);
+  const response = await authAxios.post<AuthResponse>(`${API_URL}/register`, data);
   return response.data;
 };
 
@@ -95,7 +101,7 @@ export const registerApi = async (
 export const forgotPasswordApi = async (
   data: ForgotPasswordData,
 ): Promise<{ success: boolean; message: string }> => {
-  const response = await axios.post(`${API_URL}/forgot-password`, data);
+  const response = await authAxios.post(`${API_URL}/forgot-password`, data);
   return response.data;
 };
 
@@ -105,7 +111,7 @@ export const forgotPasswordApi = async (
 export const resetPasswordApi = async (
   data: ResetPasswordData,
 ): Promise<{ success: boolean; message: string }> => {
-  const response = await axios.post(`${API_URL}/reset-password`, data);
+  const response = await authAxios.post(`${API_URL}/reset-password`, data);
   return response.data;
 };
 
@@ -113,12 +119,7 @@ export const resetPasswordApi = async (
  * Lấy thông tin user hiện tại
  */
 export const getMeApi = async (): Promise<AuthResponse> => {
-  const token = localStorage.getItem("token");
-  const response = await axios.get<AuthResponse>(`${API_URL}/me`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  const response = await authAxios.get<AuthResponse>(`${API_URL}/me`);
   return response.data;
 };
 
@@ -126,15 +127,9 @@ export const getMeApi = async (): Promise<AuthResponse> => {
  * Đăng xuất
  */
 export const logoutApi = async (): Promise<{ success: boolean }> => {
-  const token = localStorage.getItem("token");
-  const response = await axios.post(
+  const response = await authAxios.post(
     `${API_URL}/logout`,
-    {},
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    },
+    {}
   );
   return response.data;
 };

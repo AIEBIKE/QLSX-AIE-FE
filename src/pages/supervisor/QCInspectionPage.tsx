@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import Cookies from "js-cookie";
 import {
   Shield,
   CheckCircle,
@@ -40,7 +41,7 @@ export default function QCInspectionPage() {
   >({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const user = JSON.parse(Cookies.get("user") || "{}");
   const roleCode = user.roleCode || user.role;
   const isSupervisor = roleCode === "SUPERVISOR";
 

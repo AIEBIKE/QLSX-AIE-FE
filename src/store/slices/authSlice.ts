@@ -6,6 +6,7 @@
  */
 
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import Cookies from "js-cookie";
 
 /**
  * Interface cho User
@@ -32,10 +33,11 @@ interface AuthState {
  * Lấy initial state từ localStorage
  */
 const getInitialState = (): AuthState => {
-  const token = localStorage.getItem("token");
-  const userStr = localStorage.getItem("user");
+  // HttpOnly token cannot be read from JS, but we maintain user state
+  const token = null;
+  const userStr = Cookies.get("user");
 
-  if (token && userStr) {
+  if (userStr) {
     try {
       const user = JSON.parse(userStr);
       return {
@@ -46,8 +48,7 @@ const getInitialState = (): AuthState => {
       };
     } catch {
       // JSON parse error, clear storage
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      Cookies.remove("user");
     }
   }
 
@@ -78,9 +79,9 @@ const authSlice = createSlice({
       state.isAuthenticated = true;
       state.loading = false;
 
-      // Lưu vào localStorage
-      localStorage.setItem("token", action.payload.token);
-      localStorage.setItem("user", JSON.stringify(action.payload.user));
+      // Lưu vào Cookies
+      // token is managed by backend (HttpOnly)
+      Cookies.set("user", JSON.stringify(action.payload.user));
     },
 
     /**
@@ -92,9 +93,8 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.loading = false;
 
-      // Xóa khỏi localStorage
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      // Xóa khỏi Cookies
+      Cookies.remove("user");
     },
 
     /**
@@ -103,7 +103,7 @@ const authSlice = createSlice({
     updateUser: (state, action: PayloadAction<Partial<User>>) => {
       if (state.user) {
         state.user = { ...state.user, ...action.payload };
-        localStorage.setItem("user", JSON.stringify(state.user));
+        Cookies.set("user", JSON.stringify(state.user));
       }
     },
 

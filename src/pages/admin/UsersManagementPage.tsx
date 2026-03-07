@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import Cookies from "js-cookie";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -161,7 +162,7 @@ export default function UsersManagementPage() {
   const [factories, setFactories] = useState<any[]>([]);
   const [selectedFactory, setSelectedFactory] = useState<string>("all");
 
-  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const currentUser = JSON.parse(Cookies.get("user") || "{}");
   const roleCode = currentUser.roleCode || currentUser.role;
   const isAdmin = roleCode === "ADMIN" || roleCode === "admin";
   const isFacManager = roleCode === "FAC_MANAGER" || roleCode === "fac_manager";

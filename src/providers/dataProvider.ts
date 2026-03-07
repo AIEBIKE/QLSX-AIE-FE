@@ -1,16 +1,23 @@
 import { fetchUtils, DataProvider } from "react-admin";
+import Cookies from "js-cookie";
 
 // @ts-ignore
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 const httpClient = (url: string, options: fetchUtils.Options = {}) => {
-  const token = localStorage.getItem("token");
   const headers = new Headers(options.headers);
-
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
   headers.set("Content-Type", "application/json");
+
+  // Ensure cookies are sent with the request
+  options.user = {
+    authenticated: !!Cookies.get("user"),
+    token: "" // Not needed as it's in a cookie, but react-admin expects something
+  };
+
+  // react-admin's fetchUtils uses options.credentials if provided
+  if (!options.credentials) {
+    options.credentials = 'include';
+  }
 
   return fetchUtils.fetchJson(url, { ...options, headers });
 };

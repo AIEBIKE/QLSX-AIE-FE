@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import Cookies from "js-cookie";
 import {
   Plus,
   Trash2,
@@ -61,7 +62,7 @@ export default function ProductionStandardsPage() {
   const [editedStandards, setEditedStandards] = useState<Record<string, any>>(
     {},
   );
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const user = JSON.parse(Cookies.get("user") || "{}");
   const roleCode = user.roleCode || user.role;
   const isAdmin = roleCode === "ADMIN" || roleCode === "admin";
   const isFacManager = roleCode === "FAC_MANAGER" || roleCode === "fac_manager";

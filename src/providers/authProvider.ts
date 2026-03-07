@@ -1,4 +1,5 @@
 import { AuthProvider } from "react-admin";
+import Cookies from "js-cookie";
 
 // @ts-ignore
 const API_URL = import.meta.env.VITE_API_URL || "/api";
@@ -17,34 +18,32 @@ export const authProvider: AuthProvider = {
     }
 
     const { data } = await response.json();
-    localStorage.setItem("token", data.token);
-    localStorage.setItem("user", JSON.stringify(data.user));
+    // Token is HttpOnly, so we don't set it in JS
+    Cookies.set("user", JSON.stringify(data.user));
 
     return Promise.resolve();
   },
 
   logout: () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    Cookies.remove("user");
     return Promise.resolve();
   },
 
   checkAuth: () => {
-    return localStorage.getItem("token") ? Promise.resolve() : Promise.reject();
+    return Cookies.get("user") ? Promise.resolve() : Promise.reject();
   },
 
   checkError: (error) => {
     const status = error.status;
     if (status === 401 || status === 403) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      Cookies.remove("user");
       return Promise.reject();
     }
     return Promise.resolve();
   },
 
   getIdentity: () => {
-    const user = localStorage.getItem("user");
+    const user = Cookies.get("user");
     if (!user) {
       return Promise.reject();
     }
@@ -58,7 +57,7 @@ export const authProvider: AuthProvider = {
   },
 
   getPermissions: () => {
-    const user = localStorage.getItem("user");
+    const user = Cookies.get("user");
     if (!user) {
       return Promise.resolve(null);
     }
