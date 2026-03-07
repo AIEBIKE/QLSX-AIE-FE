@@ -14,7 +14,43 @@ import {
   ReactNode,
 } from "react";
 import { getMe, login as apiLogin, logout as apiLogout } from "../services/api";
-import type { User } from "../types";
+import type { User, UserRole } from "../types";
+
+/**
+ * Chuẩn hóa user object từ API response
+ * Backend trả về roleCode (viết hoa: "ADMIN", "WORKER", "SUPERVISOR", "FAC_MANAGER")
+ * Frontend cần role (viết thường: "admin", "worker", "supervisor")
+ */
+const normalizeUser = (apiUser: any): User => {
+  // Lấy role code từ nhiều nguồn có thể
+  const rawRole: string =
+    apiUser.roleCode ||
+    apiUser.role ||
+    (apiUser.roleId && typeof apiUser.roleId === "object"
+      ? apiUser.roleId.code
+      : "") ||
+    "";
+
+  // Map uppercase role code → lowercase UserRole
+  const roleMap: Record<string, UserRole> = {
+    ADMIN: "admin",
+    admin: "admin",
+    SUPERVISOR: "supervisor",
+    supervisor: "supervisor",
+    FAC_MANAGER: "supervisor", // Factory Manager → treated as supervisor in routing
+    fac_manager: "supervisor",
+    WORKER: "worker",
+    worker: "worker",
+  };
+
+  const role = roleMap[rawRole] || "worker";
+
+  return {
+    ...apiUser,
+    _id: apiUser._id || apiUser.id,
+    role,
+  };
+};
 
 interface AuthContextType {
   user: User | null;
@@ -43,7 +79,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (token && userStr) {
         try {
           const savedUser = JSON.parse(userStr);
-          setUser(savedUser);
+          setUser(normalizeUser(savedUser));
         } catch {
           // JSON parse error
           localStorage.removeItem("token");
@@ -78,7 +114,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const login = async (code: string, password: string): Promise<User> => {
     const res = await apiLogin(code, password);
-    const { token, user } = res.data.data;
+    const { token, user: rawUser } = res.data.data;
+    const user = normalizeUser(rawUser);
     localStorage.setItem("token", token);
     localStorage.setItem("user", JSON.stringify(user));
     setUser(user);
