@@ -293,4 +293,21 @@ export const getWorkerSalary = (
 ): Promise<AxiosResponse<ApiResponse<unknown>>> =>
   api.get("/registrations/salary", { params });
 
+// Factories
+export const getFactories = (
+  params?: Record<string, unknown>,
+): Promise<AxiosResponse<ApiResponse<unknown[]>>> =>
+  api.get("/factories", { params });
+export const createFactory = (
+  data: Record<string, unknown>,
+): Promise<AxiosResponse<ApiResponse<unknown>>> => api.post("/factories", data);
+export const updateFactory = (
+  id: string,
+  data: Record<string, unknown>,
+): Promise<AxiosResponse<ApiResponse<unknown>>> =>
+  api.put(`/factories/${id}`, data);
+export const deleteFactory = (
+  id: string,
+): Promise<AxiosResponse<ApiResponse<null>>> => api.delete(`/factories/${id}`);
+
 export default api;
