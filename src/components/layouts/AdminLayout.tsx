@@ -19,6 +19,8 @@ import {
   MoreVertical,
   BadgeCheck,
   CreditCard,
+  Factory,
+  ClipboardCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -56,6 +58,11 @@ const menuItems: MenuItem[] = [
     label: "Dashboard",
   },
   {
+    key: "/admin/factories",
+    icon: <Factory className="w-4 h-4" />,
+    label: "Nhà máy",
+  },
+  {
     key: "/admin/vehicle-types",
     icon: <Car className="w-4 h-4" />,
     label: "Loại xe",
@@ -79,6 +86,11 @@ const menuItems: MenuItem[] = [
     key: "/admin/registrations",
     icon: <Wrench className="w-4 h-4" />,
     label: "Đăng ký công",
+  },
+  {
+    key: "/admin/qc",
+    icon: <ClipboardCheck className="w-4 h-4" />,
+    label: "Kiểm tra QC",
   },
   {
     key: "/admin/salary-summary",

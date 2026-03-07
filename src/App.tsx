@@ -39,6 +39,10 @@ import ProductionOrderReportPage from "./pages/admin/ProductionOrderReportPage";
 import UsersManagementPage from "./pages/admin/UsersManagementPage";
 import UserWorkHistoryPage from "./pages/admin/UserWorkHistoryPage";
 import AdminSalarySummaryPage from "./pages/admin/AdminSalarySummaryPage";
+import FactoryManagementPage from "./pages/admin/FactoryManagementPage";
+
+// Supervisor Pages
+import QCInspectionPage from "./pages/supervisor/QCInspectionPage";
 
 // Shared Pages
 import AccountPage from "./pages/shared/AccountPage";
@@ -196,6 +200,14 @@ function App() {
             }
           />
           <Route
+            path="/admin/factories"
+            element={
+              <AdminRoute>
+                <FactoryManagementPage />
+              </AdminRoute>
+            }
+          />
+          <Route
             path="/admin/vehicle-types"
             element={
               <AdminRoute>
@@ -272,6 +284,14 @@ function App() {
             element={
               <AdminRoute>
                 <AccountPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/qc"
+            element={
+              <AdminRoute>
+                <QCInspectionPage />
               </AdminRoute>
             }
           />
