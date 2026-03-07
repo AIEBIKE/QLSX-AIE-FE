@@ -18,6 +18,9 @@ import {
   Building2,
   Shield,
   Hash,
+  MapPin,
+  Calendar,
+  CreditCard,
   Lock,
   Save,
   Eye,
@@ -30,7 +33,13 @@ export default function AccountPage() {
   // Profile form state
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
-  const [department, setDepartment] = useState(user?.department || "");
+  const [dateOfBirth, setDateOfBirth] = useState(
+    user?.dateOfBirth
+      ? new Date(user.dateOfBirth).toISOString().split("T")[0]
+      : "",
+  );
+  const [citizenId, setCitizenId] = useState(user?.citizenId || "");
+  const [address, setAddress] = useState(user?.address || "");
   const [profileLoading, setProfileLoading] = useState(false);
 
   // Password form state
@@ -75,7 +84,9 @@ export default function AccountPage() {
       const res = await updateProfile({
         name: name.trim(),
         email: email.trim() || undefined,
-        department: department.trim() || undefined,
+        dateOfBirth: dateOfBirth || undefined,
+        citizenId: citizenId.trim() || undefined,
+        address: address.trim() || undefined,
       });
       updateUser(res.data.data);
       toast.success("Cập nhật thông tin thành công!");
@@ -165,9 +176,7 @@ export default function AccountPage() {
             <User className="w-5 h-5 text-blue-600" />
             Thông tin cá nhân
           </CardTitle>
-          <CardDescription>
-            Cập nhật tên, email và phòng ban của bạn
-          </CardDescription>
+          <CardDescription>Cập nhật tên và email của bạn</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleProfileSubmit} className="space-y-4">
@@ -205,19 +214,54 @@ export default function AccountPage() {
               </div>
             </div>
 
-            {/* Department */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Date of Birth */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Năm sinh
+                </label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="date"
+                    value={dateOfBirth}
+                    onChange={(e) => setDateOfBirth(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Citizen ID */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">
+                  CCCD
+                </label>
+                <div className="relative">
+                  <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={citizenId}
+                    onChange={(e) => setCitizenId(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm"
+                    placeholder="Số CCCD"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Address */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">
-                Phòng ban
+                Địa chỉ
               </label>
               <div className="relative">
-                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm"
-                  placeholder="Nhập tên phòng ban"
+                  placeholder="Địa chỉ thường trú"
                 />
               </div>
             </div>

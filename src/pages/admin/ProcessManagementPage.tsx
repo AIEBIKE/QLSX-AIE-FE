@@ -50,8 +50,13 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import * as api from "../../services/api";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function ProcessManagementPage() {
+  const { user } = useAuth();
+  const roleCode = user?.roleCode || user?.role;
+  const isAdmin = roleCode === "ADMIN" || roleCode === "admin";
+
   const [vehicleTypes, setVehicleTypes] = useState<any[]>([]);
   const [selectedVehicleType, setSelectedVehicleType] = useState<any>(null);
   const [processes, setProcesses] = useState<any[]>([]);
@@ -352,15 +357,18 @@ export default function ProcessManagementPage() {
               <span className="font-semibold text-sm">
                 Các công đoạn lắp ráp
               </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => openProcessModal()}
-              >
-                <Settings className="w-4 h-4" />
-              </Button>
+              {isAdmin && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => openProcessModal()}
+                >
+                  <Settings className="w-4 h-4" />
+                </Button>
+              )}
             </div>
+
             <div className="max-h-[500px] overflow-y-auto">
               {processes.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-slate-400">
@@ -401,51 +409,55 @@ export default function ProcessManagementPage() {
                             : p.code}
                         </span>
                       </div>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 opacity-40 hover:opacity-100 text-red-500"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>
-                              Xóa công đoạn này?
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Tất cả thao tác thuộc công đoạn sẽ bị xóa.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Hủy</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDeleteProcess(p._id)}
-                              className="bg-red-500 hover:bg-red-600"
+                      {isAdmin && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 opacity-40 hover:opacity-100 text-red-500"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              Xóa
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>
+                                Xóa công đoạn này?
+                              </AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tất cả thao tác thuộc công đoạn sẽ bị xóa.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Hủy</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteProcess(p._id)}
+                                className="bg-red-500 hover:bg-red-600"
+                              >
+                                Xóa
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
                     </div>
                   </div>
                 ))
               )}
             </div>
-            <div className="px-5 py-4 border-t border-slate-200">
-              <Button
-                variant="outline"
-                className="w-full border-dashed"
-                onClick={() => openProcessModal()}
-              >
-                <Plus className="w-4 h-4 mr-1" /> Thêm công đoạn mới
-              </Button>
-            </div>
+            {isAdmin && (
+              <div className="px-5 py-4 border-t border-slate-200">
+                <Button
+                  variant="outline"
+                  className="w-full border-dashed"
+                  onClick={() => openProcessModal()}
+                >
+                  <Plus className="w-4 h-4 mr-1" /> Thêm công đoạn mới
+                </Button>
+              </div>
+            )}
           </Card>
 
           {/* Right Panel - Operations */}
@@ -475,12 +487,14 @@ export default function ProcessManagementPage() {
                       </span>
                     </div>
                   </div>
-                  <Button
-                    onClick={() => openOperationModal()}
-                    className="bg-[#0077c0] hover:bg-[#005fa3]"
-                  >
-                    <Plus className="w-4 h-4 mr-1" /> Thêm thao tác
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      onClick={() => openOperationModal()}
+                      className="bg-[#0077c0] hover:bg-[#005fa3]"
+                    >
+                      <Plus className="w-4 h-4 mr-1" /> Thêm thao tác
+                    </Button>
+                  )}
                 </div>
 
                 <div className="px-6 overflow-x-auto">
@@ -505,7 +519,7 @@ export default function ProcessManagementPage() {
                           <th className="py-3 text-center text-slate-500 font-medium">
                             ĐỘ KHÓ
                           </th>
-                          <th className="py-3 w-14"></th>
+                          {isAdmin && <th className="py-3 w-14"></th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -536,16 +550,18 @@ export default function ProcessManagementPage() {
                             <td className="py-3 text-center">
                               <DifficultyStars value={op.difficulty || 3} />
                             </td>
-                            <td className="py-3">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => openOperationModal(op)}
-                              >
-                                <Settings className="w-4 h-4" />
-                              </Button>
-                            </td>
+                            {isAdmin && (
+                              <td className="py-3">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => openOperationModal(op)}
+                                >
+                                  <Settings className="w-4 h-4" />
+                                </Button>
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>

@@ -1,17 +1,53 @@
 // ==================== Core Types ====================
 
-export type UserRole = "admin" | "supervisor" | "worker";
+export type UserRole = "ADMIN" | "FAC_MANAGER" | "SUPERVISOR" | "WORKER" | "admin" | "supervisor" | "worker";
+
+export interface Role {
+  _id: string;
+  name: string;
+  code: UserRole;
+  description?: string;
+}
 
 export interface User {
   _id: string;
   code: string;
   name: string;
   email?: string;
-  department?: string;
-  role: UserRole;
+  role: string; // Backward compatibility
+  roleId: string | Role; // New Role linkage
+  roleCode?: UserRole; // Helper for frontend logic
+  dateOfBirth?: string;
+  citizenId?: string;
+  address?: string;
+  factoryId?: string; // Home factory
+  factories_manage?: string; // Managed factory (for FAC_MANAGER)
   active: boolean;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface Factory {
+  _id: string;
+  name: string;
+  code: string;
+  location?: string;
+  active: boolean;
+}
+
+export interface QualityControl {
+  _id: string;
+  productionOrderId: string;
+  frameNumber: string;
+  engineNumber: string;
+  inspectionDate: string;
+  inspectorId: string;
+  results: Array<{
+    operationId: string;
+    status: "pass" | "fail";
+    note?: string;
+  }>;
+  status: "passed" | "failed";
 }
 
 export interface VehicleType {
@@ -66,11 +102,13 @@ export interface ProductionOrder {
 
 export interface ProductionStandard {
   _id: string;
-  vehicleType: string | VehicleType;
-  operation: string | Operation;
-  standardTime: number; // minutes per unit
+  vehicleTypeId: string | VehicleType;
+  operationId: string | Operation;
+  factoryId: string | Factory;
+  expectedQuantity: number;
+  bonusPerUnit?: number;
+  penaltyPerUnit?: number;
   description?: string;
-  active: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -82,11 +120,22 @@ export interface Registration {
   user: string | User;
   productionOrder: string | ProductionOrder;
   operation: string | Operation;
+  factoryId: string;
   status: RegistrationStatus;
   startTime: string;
   endTime?: string;
   quantity?: number;
+  expectedQuantity: number;
   duration?: number; // in minutes
+  workingMinutes?: number;
+  bonusAmount?: number;
+  penaltyAmount?: number;
+  actualQuantity?: number;
+  interruptionNote?: string;
+  interruptionMinutes?: number;
+  adjustedExpectedQty?: number;
+  isReplacement?: boolean;
+  reassignedFrom?: string;
   notes?: string;
   createdAt?: string;
   updatedAt?: string;

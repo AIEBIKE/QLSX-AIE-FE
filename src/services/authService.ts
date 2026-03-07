@@ -21,8 +21,7 @@ export interface RegisterData {
   code?: string;
   email?: string;
   password: string;
-  department?: string;
-  role?: "worker" | "supervisor" | "admin";
+  role?: "worker" | "supervisor" | "admin" | "fac_manager";
 }
 
 /**
@@ -49,8 +48,7 @@ export interface AuthResponse {
       name: string;
       code: string;
       email?: string;
-      role: "admin" | "supervisor" | "worker";
-      department?: string;
+      role: "admin" | "supervisor" | "worker" | "fac_manager";
     };
   };
   error?: {

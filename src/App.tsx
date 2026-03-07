@@ -29,6 +29,7 @@ import SalaryPage from "./pages/worker/SalaryPage";
 import SummaryPage from "./pages/SummaryPage";
 
 // Admin Pages
+// Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import VehicleTypesPage from "./pages/admin/VehicleTypesPage";
 import ProcessManagementPage from "./pages/admin/ProcessManagementPage";
@@ -39,6 +40,8 @@ import ProductionOrderReportPage from "./pages/admin/ProductionOrderReportPage";
 import UsersManagementPage from "./pages/admin/UsersManagementPage";
 import UserWorkHistoryPage from "./pages/admin/UserWorkHistoryPage";
 import AdminSalarySummaryPage from "./pages/admin/AdminSalarySummaryPage";
+import FactoryManagementPage from "./pages/admin/FactoryManagementPage";
+import QCInspectionPage from "./pages/supervisor/QCInspectionPage";
 
 // Shared Pages
 import AccountPage from "./pages/shared/AccountPage";
@@ -61,7 +64,17 @@ const AdminRoute = ({ children }: RouteGuardProps) => {
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
 
-  if (!["admin", "supervisor"].includes(user.role)) {
+  const userRole = (user as any)?.roleCode || user.role;
+  const adminRoles = [
+    "admin",
+    "ADMIN",
+    "supervisor",
+    "SUPERVISOR",
+    "fac_manager",
+    "FAC_MANAGER",
+  ];
+
+  if (!adminRoles.includes(userRole)) {
     return <Navigate to="/worker" replace />;
   }
 
@@ -85,7 +98,9 @@ const RoleBasedRedirect = () => {
   if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
 
-  if (user.role === "worker") {
+  const userRole = (user as any)?.roleCode || user.role;
+
+  if (["worker", "WORKER"].includes(userRole)) {
     return <Navigate to="/worker" replace />;
   }
 
@@ -93,6 +108,7 @@ const RoleBasedRedirect = () => {
 };
 
 // Guest route
+
 const GuestRoute = ({ children }: RouteGuardProps) => {
   const { user, loading } = useAuth();
 
@@ -272,6 +288,22 @@ function App() {
             element={
               <AdminRoute>
                 <AccountPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/factories"
+            element={
+              <AdminRoute>
+                <FactoryManagementPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/qc"
+            element={
+              <AdminRoute>
+                <QCInspectionPage />
               </AdminRoute>
             }
           />

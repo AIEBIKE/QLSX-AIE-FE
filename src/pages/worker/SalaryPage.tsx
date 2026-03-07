@@ -34,7 +34,7 @@ export default function SalaryPage() {
       const month = d.month() + 1;
       const year = d.year();
       const res = await api.getWorkerSalary({ month, year });
-      const data = res.data.data;
+      const data: any = res.data.data;
       setSalaryData(data?.summary || null);
       setDailyBreakdown(data?.dailyDetails || []);
     } catch (err) {
@@ -165,8 +165,7 @@ export default function SalaryPage() {
             </Badge>
           </div>
           <p className="text-sm text-slate-500">
-            Công nhân: <strong>{user?.name}</strong> (Mã: {user?.code}) •{" "}
-            {user?.department || "Phân xưởng lắp ráp"}
+            Công nhân: <strong>{user?.name}</strong> (Mã: {user?.code})
           </p>
         </div>
         <div className="flex gap-3 items-center">

@@ -33,9 +33,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import * as api from "../../services/api";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function VehicleTypesPage() {
+  const { user } = useAuth();
+  const roleCode = user?.roleCode || user?.role;
+  const isAdmin = roleCode === "ADMIN" || roleCode === "admin";
+
   const [vehicleTypes, setVehicleTypes] = useState<any[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -126,9 +132,14 @@ export default function VehicleTypesPage() {
     <div>
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
         <h2 className="text-xl font-bold text-slate-800">🚗 Loại Xe</h2>
-        <Button onClick={handleAdd} className="bg-[#0077c0] hover:bg-[#005fa3]">
-          <Plus className="w-4 h-4 mr-1" /> Thêm
-        </Button>
+        {isAdmin && (
+          <Button
+            onClick={handleAdd}
+            className="bg-[#0077c0] hover:bg-[#005fa3]"
+          >
+            <Plus className="w-4 h-4 mr-1" /> Thêm
+          </Button>
+        )}
       </div>
 
       {isMobile ? (
@@ -159,43 +170,45 @@ export default function VehicleTypesPage() {
                     {vt.active ? "On" : "Off"}
                   </Badge>
                 </div>
-                <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleEdit(vt)}
-                  >
-                    <Pencil className="w-3.5 h-3.5 mr-1" /> Sửa
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-red-500"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 mr-1" /> Xóa
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Xóa loại xe này?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Hành động này không thể hoàn tác
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Hủy</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDelete(vt._id)}
-                          className="bg-red-500 hover:bg-red-600"
+                {isAdmin && (
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleEdit(vt)}
+                    >
+                      <Pencil className="w-3.5 h-3.5 mr-1" /> Sửa
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-500"
                         >
-                          Xóa
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
+                          <Trash2 className="w-3.5 h-3.5 mr-1" /> Xóa
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Xóa loại xe này?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Hành động này không thể hoàn tác
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Hủy</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDelete(vt._id)}
+                            className="bg-red-500 hover:bg-red-600"
+                          >
+                            Xóa
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -209,7 +222,11 @@ export default function VehicleTypesPage() {
                 <TableHead>Tên loại xe</TableHead>
                 <TableHead>Prefix Khung</TableHead>
                 <TableHead className="w-[100px]">Trạng thái</TableHead>
-                <TableHead className="w-[120px] text-right">Thao tác</TableHead>
+                {isAdmin && (
+                  <TableHead className="w-[120px] text-right">
+                    Thao tác
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -234,48 +251,50 @@ export default function VehicleTypesPage() {
                       {vt.active ? "Hoạt động" : "Tắt"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={() => handleEdit(vt)}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 text-red-500"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>
-                              Xóa loại xe này?
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Hành động này không thể hoàn tác
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Hủy</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(vt._id)}
-                              className="bg-red-500 hover:bg-red-600"
+                  {isAdmin && (
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          onClick={() => handleEdit(vt)}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 text-red-500"
                             >
-                              Xóa
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>
+                                Xóa loại xe này?
+                              </AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Hành động này không thể hoàn tác
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Hủy</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDelete(vt._id)}
+                                className="bg-red-500 hover:bg-red-600"
+                              >
+                                Xóa
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

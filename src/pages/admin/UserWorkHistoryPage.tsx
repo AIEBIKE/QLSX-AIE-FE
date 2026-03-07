@@ -41,7 +41,7 @@ export default function UserWorkHistoryPage() {
       const params: any = {};
       if (startDate) params.startDate = new Date(startDate).toISOString();
       if (endDate) params.endDate = new Date(endDate).toISOString();
-      const res = await api.getUserWorkHistory(id, params);
+      const res = await api.getUserWorkHistory(id as string, params);
       setData(res.data.data);
     } catch (error) {
       console.error("Lỗi tải lịch sử:", error);
@@ -97,12 +97,6 @@ export default function UserWorkHistoryPage() {
         </CardHeader>
         <CardContent>
           <div className="flex gap-6 text-sm text-slate-500">
-            <span>
-              Phòng ban:{" "}
-              <strong className="text-slate-700">
-                {user?.department || "-"}
-              </strong>
-            </span>
             <span>
               Vai trò: <strong className="text-slate-700">{user?.role}</strong>
             </span>

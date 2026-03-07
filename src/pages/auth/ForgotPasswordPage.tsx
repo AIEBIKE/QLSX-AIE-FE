@@ -31,7 +31,7 @@ export default function ForgotPasswordPage() {
   const [isSuccess, setIsSuccess] = useState(false);
 
   const forgotMutation = useMutation({
-    mutationFn: (email: string) => forgotPasswordApi(email),
+    mutationFn: (email: string) => forgotPasswordApi({ email }),
     onSuccess: (data) => {
       if (data.success) {
         setIsSuccess(true);
@@ -40,7 +40,7 @@ export default function ForgotPasswordPage() {
         });
       } else {
         toast.error("Thất bại", {
-          description: data.error?.message || "Có lỗi xảy ra",
+          description: (data as any).error?.message || "Có lỗi xảy ra",
         });
       }
     },

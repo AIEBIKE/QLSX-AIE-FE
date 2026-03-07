@@ -1,5 +1,6 @@
 import { AuthProvider } from "react-admin";
 
+// @ts-ignore
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 export const authProvider: AuthProvider = {

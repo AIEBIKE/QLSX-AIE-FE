@@ -14,6 +14,7 @@ import {
   BadgeCheck,
   CreditCard,
   Bell,
+  Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -78,7 +79,13 @@ export default function WorkerLayout({ children }: WorkerLayoutProps) {
   ];
 
   const extraMenuItems: MenuItem[] = [];
-  if (user?.role === "admin" || user?.role === "supervisor") {
+  const roleCode = user?.roleCode || user?.role;
+  if (
+    roleCode === "admin" ||
+    roleCode === "ADMIN" ||
+    roleCode === "FAC_MANAGER" ||
+    roleCode === "supervisor"
+  ) {
     extraMenuItems.push({
       key: "/admin",
       icon: <Settings className="w-4 h-4" />,
@@ -105,10 +112,19 @@ export default function WorkerLayout({ children }: WorkerLayoutProps) {
     return name[0].toUpperCase();
   };
 
-  const getRoleLabel = (role?: string) => {
-    if (role === "worker") return "Công nhân";
-    if (role === "admin") return "Quản trị";
-    return "Giám sát";
+  const getRoleLabel = (u: any) => {
+    if (u?.roleId?.name) return u.roleId.name;
+    const code = u?.roleCode || u?.role;
+    const mapping: Record<string, string> = {
+      ADMIN: "Quản trị viên",
+      FAC_MANAGER: "Quản lý nhà máy",
+      SUPERVISOR: "Giám sát (QA/QC)",
+      WORKER: "Công nhân",
+      admin: "Quản trị viên",
+      supervisor: "Quản lý nhà máy",
+      worker: "Công nhân",
+    };
+    return mapping[code] || "Người dùng";
   };
 
   const siderWidth = collapsed ? 64 : 200;
@@ -187,7 +203,7 @@ export default function WorkerLayout({ children }: WorkerLayoutProps) {
                     {user?.name}
                   </div>
                   <div className="text-white/60 text-xs truncate">
-                    {user?.code} • {getRoleLabel(user?.role)}
+                    {user?.code} • {getRoleLabel(user)}
                   </div>
                 </div>
                 <MoreVertical className="w-4 h-4 text-white/60" />
@@ -211,7 +227,7 @@ export default function WorkerLayout({ children }: WorkerLayoutProps) {
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user?.name}</span>
                 <span className="truncate text-xs text-muted-foreground">
-                  {user?.code} • {getRoleLabel(user?.role)}
+                  {user?.code} • {getRoleLabel(user)}
                 </span>
               </div>
             </div>
@@ -305,62 +321,73 @@ export default function WorkerLayout({ children }: WorkerLayoutProps) {
           </div>
 
           {/* Right side - User */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
-                <Avatar className="w-9 h-9">
-                  <AvatarFallback className="bg-emerald-600 text-white text-sm font-semibold">
-                    {getInitials(user?.name || "")}
-                  </AvatarFallback>
-                </Avatar>
-                {!isMobile && (
-                  <span className="font-semibold text-sm text-slate-700">
-                    {user?.name}
-                  </span>
-                )}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 rounded-lg">
-              <DropdownMenuLabel className="p-0 font-normal">
-                <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                  <Avatar className="h-8 w-8 rounded-lg">
-                    <AvatarFallback className="rounded-lg bg-emerald-600 text-white text-xs font-semibold">
+          <div className="flex items-center gap-3">
+            {/* Factory Info */}
+            {(user as any)?.factory && (
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-lg">
+                <Building2 className="w-4 h-4 text-emerald-600" />
+                <span className="text-sm font-medium text-emerald-800">
+                  Nhà máy: {(user as any).factory.name}
+                </span>
+              </div>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                  <Avatar className="w-9 h-9">
+                    <AvatarFallback className="bg-emerald-600 text-white text-sm font-semibold">
                       {getInitials(user?.name || "")}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">{user?.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {user?.code} • {getRoleLabel(user?.role)}
+                  {!isMobile && (
+                    <span className="font-semibold text-sm text-slate-700">
+                      {user?.name}
                     </span>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 rounded-lg">
+                <DropdownMenuLabel className="p-0 font-normal">
+                  <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                    <Avatar className="h-8 w-8 rounded-lg">
+                      <AvatarFallback className="rounded-lg bg-emerald-600 text-white text-xs font-semibold">
+                        {getInitials(user?.name || "")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="grid flex-1 text-left text-sm leading-tight">
+                      <span className="truncate font-medium">{user?.name}</span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {user?.code} • {getRoleLabel(user)}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuItem onClick={() => navigate("/worker/account")}>
-                  <BadgeCheck className="w-4 h-4 mr-2" />
-                  Tài khoản
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem onClick={() => navigate("/worker/account")}>
+                    <BadgeCheck className="w-4 h-4 mr-2" />
+                    Tài khoản
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/worker/salary")}>
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    Lương & Thưởng
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/worker")}>
+                    <Bell className="w-4 h-4 mr-2" />
+                    Thông báo
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="text-red-600 focus:text-red-600"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Đăng xuất
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate("/worker/salary")}>
-                  <CreditCard className="w-4 h-4 mr-2" />
-                  Lương & Thưởng
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate("/worker")}>
-                  <Bell className="w-4 h-4 mr-2" />
-                  Thông báo
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={handleLogout}
-                className="text-red-600 focus:text-red-600"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Đăng xuất
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </header>
 
         {/* Page Content */}

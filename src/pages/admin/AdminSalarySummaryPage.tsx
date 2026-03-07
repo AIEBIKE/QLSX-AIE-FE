@@ -61,7 +61,7 @@ const getInitials = (name: string) => {
 };
 
 interface WorkerStat {
-  user: { _id: string; code: string; name: string; department?: string };
+  user: { _id: string; code: string; name: string };
   totalQuantity: number;
   totalBonus: number;
   totalPenalty: number;
@@ -275,7 +275,7 @@ export default function AdminSalarySummaryPage() {
                       fontSize={12}
                     />
                     <RechartsTooltip
-                      formatter={(v: number) => formatCurrency(v)}
+                      formatter={(v: any) => formatCurrency(v as number)}
                       labelFormatter={(l) => dayjs(l).format("DD/MM/YYYY")}
                     />
                     <Legend />
@@ -378,9 +378,6 @@ export default function AdminSalarySummaryPage() {
                               <div className="font-medium">{w.user.name}</div>
                               <span className="text-xs text-slate-400">
                                 {w.user.code}
-                                {w.user.department
-                                  ? ` • ${w.user.department}`
-                                  : ""}
                               </span>
                             </div>
                           </div>

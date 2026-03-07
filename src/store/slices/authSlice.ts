@@ -15,8 +15,7 @@ interface User {
   name: string;
   code: string;
   email?: string;
-  role: "admin" | "supervisor" | "worker";
-  department?: string;
+  role: "admin" | "supervisor" | "worker" | "fac_manager";
 }
 
 /**

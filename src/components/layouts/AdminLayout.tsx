@@ -20,6 +20,8 @@ import {
   MoreVertical,
   BadgeCheck,
   CreditCard,
+  Building2,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -57,6 +59,11 @@ const menuItems: MenuItem[] = [
     label: "Dashboard",
   },
   {
+    key: "/admin/factories",
+    icon: <Building2 className="w-4 h-4" />,
+    label: "Nhà máy",
+  },
+  {
     key: "/admin/vehicle-types",
     icon: <Car className="w-4 h-4" />,
     label: "Loại xe",
@@ -80,6 +87,11 @@ const menuItems: MenuItem[] = [
     key: "/admin/registrations",
     icon: <Wrench className="w-4 h-4" />,
     label: "Đăng ký công",
+  },
+  {
+    key: "/admin/qc",
+    icon: <ShieldCheck className="w-4 h-4" />,
+    label: "Kiểm tra QC",
   },
   {
     key: "/admin/salary-summary",
@@ -155,6 +167,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     return name[0].toUpperCase();
   };
 
+  const getRoleName = (u: any) => {
+    if (u?.roleId?.name) return u.roleId.name;
+    const code = u?.roleCode || u?.role;
+    const mapping: Record<string, string> = {
+      ADMIN: "Quản trị viên",
+      FAC_MANAGER: "Quản lý nhà máy",
+      SUPERVISOR: "Giám sát (QA/QC)",
+      WORKER: "Công nhân",
+      admin: "Quản trị viên",
+      supervisor: "Quản lý nhà máy",
+      worker: "Công nhân",
+    };
+    return mapping[code] || "Người dùng";
+  };
+
   const siderWidth = collapsed ? 64 : 220;
 
   const NavItem = ({ item }: { item: MenuItem }) => {
@@ -193,16 +220,75 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Menu Items */}
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-        {menuItems.map((item) => (
-          <NavItem key={item.key} item={item} />
-        ))}
+        {menuItems
+          .filter((item) => {
+            const role = user?.roleCode || user?.role;
+            if (role === "ADMIN" || role === "admin") return true;
 
-        {/* Divider */}
-        <div className="my-2 border-t border-white/10" />
+            // Quản lý nhà máy
+            if (role === "FAC_MANAGER" || role === "fac_manager") {
+              const facManagerIncluded = [
+                "/admin",
+                "/admin/factories",
+                "/admin/vehicle-types",
+                "/admin/processes",
+                "/admin/orders",
+                "/admin/standards",
+                "/admin/users", // Quản lý công nhân
+              ];
+              // Có thể giữ lại các tab báo cáo nếu cần thiết, ví dụ: "/admin/registrations", "/admin/salary-summary"
+              // Nhưng theo yêu cầu rạch ròi thì hiện tại đưa vào các tab chính trước.
+              return (
+                facManagerIncluded.includes(item.key) ||
+                item.key === "/admin/registrations" ||
+                item.key === "/admin/salary-summary"
+              );
+            }
 
-        {extraMenuItems.map((item) => (
-          <NavItem key={item.key} item={item} />
-        ))}
+            // Giám sát QA/QC
+            if (role === "SUPERVISOR" || role === "supervisor") {
+              const supervisorIncluded = [
+                "/admin",
+                "/admin/factories",
+                "/admin/vehicle-types",
+                "/admin/processes",
+                "/admin/orders",
+                "/admin/standards",
+                "/admin/qc",
+                "/admin/registrations", // Thêm đăng ký công cho GS
+              ];
+              return supervisorIncluded.includes(item.key);
+            }
+
+            return false;
+          })
+
+          .map((item) => {
+            const role = user?.roleCode || user?.role;
+            const isFacManager =
+              role === "FAC_MANAGER" || role === "fac_manager";
+            let displayItem = { ...item };
+            if (isFacManager && item.key === "/admin/users") {
+              displayItem.label = "Quản lý công nhân";
+            }
+            return <NavItem key={displayItem.key} item={displayItem} />;
+          })}
+
+        {/* Divider and Extra Items */}
+        {extraMenuItems
+          .filter((item) => {
+            const role = user?.roleCode || user?.role;
+            if (item.key === "/worker") {
+              return role === "WORKER" || role === "worker";
+            }
+            return true;
+          })
+          .map((item) => (
+            <div key={item.key}>
+              <div className="my-2 border-t border-white/10" />
+              <NavItem item={item} />
+            </div>
+          ))}
       </nav>
 
       {/* User Profile Section at bottom */}
@@ -229,8 +315,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     {user?.name}
                   </div>
                   <div className="text-white/60 text-xs truncate">
-                    {user?.code} •{" "}
-                    {user?.role === "admin" ? "Quản trị viên" : "Giám sát"}
+                    {user?.code} • {getRoleName(user)}
                   </div>
                 </div>
                 <MoreVertical className="w-4 h-4 text-white/60" />
@@ -254,8 +339,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user?.name}</span>
                 <span className="truncate text-xs text-muted-foreground">
-                  {user?.code} •{" "}
-                  {user?.role === "admin" ? "Quản trị viên" : "Giám sát"}
+                  {user?.code} • {getRoleName(user)}
                 </span>
               </div>
             </div>
@@ -346,6 +430,18 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
             {/* Right side */}
             <div className="flex items-center gap-3">
+              {/* Factory Info for Non-Admins */}
+              {user?.roleCode !== "ADMIN" &&
+                user?.roleCode !== "admin" &&
+                (user as any).factory && (
+                  <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-lg">
+                    <Building2 className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-800">
+                      Nhà máy: {(user as any).factory.name}
+                    </span>
+                  </div>
+                )}
+
               {/* Notification Bell */}
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -406,10 +502,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                           {user?.name}
                         </span>
                         <span className="truncate text-xs text-muted-foreground">
-                          {user?.code} •{" "}
-                          {user?.role === "admin"
-                            ? "Quản trị viên"
-                            : "Giám sát"}
+                          {user?.code} • {getRoleName(user)}
                         </span>
                       </div>
                     </div>

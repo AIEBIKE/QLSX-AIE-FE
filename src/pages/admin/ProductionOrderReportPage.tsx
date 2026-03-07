@@ -39,7 +39,7 @@ export default function ProductionOrderReportPage() {
   const loadReport = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.getOrderReport(id);
+      const res = await api.getOrderReport(id || "");
       setReport(res.data.data);
     } catch (error) {
       console.error("Lỗi tải báo cáo:", error);

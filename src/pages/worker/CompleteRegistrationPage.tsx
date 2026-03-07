@@ -50,11 +50,11 @@ export default function CompleteRegistrationPage() {
     if (submitting || actualQuantity === null) return;
     setSubmitting(true);
     try {
-      await api.completeRegistration(id, {
-        actualQuantity,
+      await api.completeRegistration(id || "", {
+        quantity: actualQuantity,
         interruptionNote: interruptionNote || "",
         interruptionMinutes: interruptionMinutes || 0,
-      });
+      } as any);
       toast.success("Đã lưu thành công!");
       navigate("/worker");
     } catch (err: any) {

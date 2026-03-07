@@ -1,5 +1,6 @@
 import { fetchUtils, DataProvider } from "react-admin";
 
+// @ts-ignore
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 const httpClient = (url: string, options: fetchUtils.Options = {}) => {

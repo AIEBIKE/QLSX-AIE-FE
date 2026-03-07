@@ -116,6 +116,11 @@ const getRoleBadge = (role: string) => {
       className: "bg-emerald-100 text-emerald-700 border-emerald-200",
       icon: <Users className="w-3 h-3" />,
     },
+    fac_manager: {
+      label: "Quản lý nhà máy",
+      className: "bg-purple-100 text-purple-700 border-purple-200",
+      icon: <Users className="w-3 h-3" />,
+    },
   };
   return (
     map[role] || {
@@ -131,10 +136,13 @@ interface UserType {
   _id: string;
   code: string;
   name: string;
-  role: "admin" | "supervisor" | "worker";
-  department?: string;
+  role: string;
+  factoryId?: any; // Liên kết nhà máy
   active: boolean;
   status?: "pending" | "approved" | "rejected";
+  dateOfBirth?: string;
+  citizenId?: string;
+  address?: string;
   createdAt?: string;
 }
 
@@ -150,6 +158,25 @@ export default function UsersManagementPage() {
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
+  const [factories, setFactories] = useState<any[]>([]);
+  const [selectedFactory, setSelectedFactory] = useState<string>("all");
+
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const roleCode = currentUser.roleCode || currentUser.role;
+  const isAdmin = roleCode === "ADMIN" || roleCode === "admin";
+  const isFacManager = roleCode === "FAC_MANAGER" || roleCode === "fac_manager";
+
+  useEffect(() => {
+    const loadFactories = async () => {
+      try {
+        const res = await api.getFactories();
+        setFactories(res.data.data || []);
+      } catch (err) {
+        console.error("Error loading factories:", err);
+      }
+    };
+    loadFactories();
+  }, []);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -157,8 +184,11 @@ export default function UsersManagementPage() {
     name: "",
     role: "worker" as string,
     password: "",
-    department: "",
+    factoryId: "",
     active: true,
+    dateOfBirth: "",
+    citizenId: "",
+    address: "",
   });
   const [showPassword, setShowPassword] = useState(false);
 
@@ -184,7 +214,9 @@ export default function UsersManagementPage() {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const res = await api.getUsers();
+      const query: any = {};
+      if (selectedFactory !== "all") query.factoryId = selectedFactory;
+      const res = await api.getUsers(query);
       setUsers(res.data.data || []);
     } catch (error: any) {
       toast.error("Lỗi tải danh sách: " + error.message);
@@ -205,7 +237,7 @@ export default function UsersManagementPage() {
   useEffect(() => {
     loadUsers();
     loadPendingUsers();
-  }, []);
+  }, [selectedFactory]);
 
   // Fetch next employee code based on role
   const fetchNextCode = useCallback(async (role: string) => {
@@ -266,8 +298,7 @@ export default function UsersManagementPage() {
       const matchSearch =
         searchText === "" ||
         user.name.toLowerCase().includes(searchText.toLowerCase()) ||
-        user.code.toLowerCase().includes(searchText.toLowerCase()) ||
-        user.department?.toLowerCase().includes(searchText.toLowerCase());
+        user.code.toLowerCase().includes(searchText.toLowerCase());
       const matchRole = filterRole === "all" || user.role === filterRole;
       const matchStatus =
         filterStatus === "all" ||
@@ -277,22 +308,16 @@ export default function UsersManagementPage() {
     });
   }, [users, searchText, filterRole, filterStatus]);
 
-  // Departments
-  const departments = useMemo(() => {
-    const depts = new Set<string>();
-    users.forEach((u) => {
-      if (u.department) depts.add(u.department);
-    });
-    return Array.from(depts);
-  }, [users]);
-
   const handleSubmit = async () => {
     try {
       const payload: any = {
         name: formData.name,
         code: formData.code,
         role: formData.role,
-        department: formData.department || undefined,
+        factoryId: formData.factoryId || undefined,
+        dateOfBirth: formData.dateOfBirth || undefined,
+        citizenId: formData.citizenId || undefined,
+        address: formData.address || undefined,
       };
       if (editingUser) {
         if (formData.password) payload.password = formData.password;
@@ -332,8 +357,11 @@ export default function UsersManagementPage() {
       name: "",
       role: "worker",
       password: "",
-      department: "",
+      factoryId: isFacManager ? currentUser.factoryId || "" : "",
       active: true,
+      dateOfBirth: "",
+      citizenId: "",
+      address: "",
     });
     setEditingUser(null);
   };
@@ -345,8 +373,16 @@ export default function UsersManagementPage() {
       name: user.name,
       role: user.role,
       password: "",
-      department: user.department || "",
+      factoryId:
+        typeof user.factoryId === "object"
+          ? user.factoryId?._id
+          : user.factoryId || "",
       active: user.active,
+      dateOfBirth: user.dateOfBirth
+        ? new Date(user.dateOfBirth).toISOString().split("T")[0]
+        : "",
+      citizenId: user.citizenId || "",
+      address: user.address || "",
     });
     setModalOpen(true);
   };
@@ -395,7 +431,12 @@ export default function UsersManagementPage() {
       icon: <XCircle className="w-4 h-4 text-gray-400" />,
       color: "text-gray-500",
     },
-  ];
+  ].filter((s) => {
+    if (isFacManager) {
+      return s.label !== "Admin" && s.label !== "Giám sát";
+    }
+    return true;
+  });
 
   return (
     <TooltipProvider>
@@ -404,19 +445,22 @@ export default function UsersManagementPage() {
         <div className="flex justify-between items-start flex-wrap gap-3 mb-6">
           <div>
             <h2 className="text-2xl font-bold text-slate-800">
-              👥 Quản lý người dùng
+              👥 {isFacManager ? "Quản lý công nhân" : "Quản lý người dùng"}
             </h2>
             <p className="text-slate-500 text-sm mt-1">
-              Quản lý thông tin và phân quyền người dùng trong hệ thống
+              Quản lý thông tin và phân quyền{" "}
+              {isFacManager ? "công nhân" : "người dùng"} trong hệ thống
             </p>
           </div>
-          <Button
-            onClick={openCreate}
-            className="bg-[#0077c0] hover:bg-[#005fa3]"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Thêm người dùng
-          </Button>
+          {!isFacManager && (
+            <Button
+              onClick={openCreate}
+              className="bg-[#0077c0] hover:bg-[#005fa3]"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Thêm người dùng
+            </Button>
+          )}
         </div>
 
         {/* Stats */}
@@ -440,147 +484,150 @@ export default function UsersManagementPage() {
             <TabsTrigger value="all" className="gap-1.5">
               <Users className="w-4 h-4" /> Tất cả ({users.length})
             </TabsTrigger>
-            <TabsTrigger value="pending" className="gap-1.5 relative">
-              <Clock className="w-4 h-4 text-amber-500" /> Chờ duyệt
-              {pendingUsers.length > 0 && (
-                <span className="ml-1 bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">
-                  {pendingUsers.length}
-                </span>
-              )}
-            </TabsTrigger>
+            {!isFacManager && (
+              <TabsTrigger value="pending" className="gap-1.5 relative">
+                <Clock className="w-4 h-4 text-amber-500" /> Chờ duyệt
+                {pendingUsers.length > 0 && (
+                  <span className="ml-1 bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">
+                    {pendingUsers.length}
+                  </span>
+                )}
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Pending tab */}
-          <TabsContent value="pending">
-            <Card className="border-slate-200">
-              <CardContent className="pt-4">
-                {pendingUsers.length === 0 ? (
-                  <div className="text-center py-10">
-                    <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
-                    <h3 className="text-lg font-semibold text-slate-700">
-                      Không có tài khoản chờ duyệt
-                    </h3>
-                    <p className="text-slate-500 text-sm">
-                      Tất cả tài khoản đã được xử lý
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {pendingUsers.map((u) => {
-                      const roleBadge = getRoleBadge(u.role);
-                      return (
-                        <div
-                          key={u._id}
-                          className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Avatar className="w-10 h-10">
-                              <AvatarFallback
-                                style={{
-                                  backgroundColor: getAvatarColor(u.name),
-                                }}
-                                className="text-white text-sm font-semibold"
-                              >
-                                {getInitials(u.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-sm">
-                                  {u.name}
-                                </span>
-                                <Badge variant="outline" className="text-xs">
-                                  {u.code}
-                                </Badge>
-                                <Badge
-                                  variant="outline"
-                                  className={`text-xs ${roleBadge.className}`}
+          {!isFacManager && (
+            <TabsContent value="pending">
+              <Card className="border-slate-200">
+                <CardContent className="pt-4">
+                  {pendingUsers.length === 0 ? (
+                    <div className="text-center py-10">
+                      <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
+                      <h3 className="text-lg font-semibold text-slate-700">
+                        Không có tài khoản chờ duyệt
+                      </h3>
+                      <p className="text-slate-500 text-sm">
+                        Tất cả tài khoản đã được xử lý
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {pendingUsers.map((u) => {
+                        const roleBadge = getRoleBadge(u.role);
+                        return (
+                          <div
+                            key={u._id}
+                            className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Avatar className="w-10 h-10">
+                                <AvatarFallback
+                                  style={{
+                                    backgroundColor: getAvatarColor(u.name),
+                                  }}
+                                  className="text-white text-sm font-semibold"
                                 >
-                                  {roleBadge.icon}
-                                  <span className="ml-1">
-                                    {roleBadge.label}
+                                  {getInitials(u.name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold text-sm">
+                                    {u.name}
                                   </span>
-                                </Badge>
+                                  <Badge variant="outline" className="text-xs">
+                                    {u.code}
+                                  </Badge>
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-xs ${roleBadge.className}`}
+                                  >
+                                    {roleBadge.icon}
+                                    <span className="ml-1">
+                                      {roleBadge.label}
+                                    </span>
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-slate-500">
+                                  Đăng ký:{" "}
+                                  {u.createdAt
+                                    ? new Date(u.createdAt).toLocaleDateString(
+                                        "vi-VN",
+                                      )
+                                    : "N/A"}
+                                </p>
                               </div>
-                              <p className="text-xs text-slate-500">
-                                {u.department && `${u.department} • `}
-                                Đăng ký:{" "}
-                                {u.createdAt
-                                  ? new Date(u.createdAt).toLocaleDateString(
-                                      "vi-VN",
-                                    )
-                                  : "N/A"}
-                              </p>
                             </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  className="bg-emerald-500 hover:bg-emerald-600"
-                                >
-                                  <CheckCircle className="w-3.5 h-3.5 mr-1" />{" "}
-                                  Duyệt
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>
-                                    Duyệt tài khoản?
-                                  </AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Người dùng sẽ có thể đăng nhập sau khi được
-                                    duyệt
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Hủy</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleApprove(u._id)}
+                            <div className="flex gap-2">
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    size="sm"
                                     className="bg-emerald-500 hover:bg-emerald-600"
                                   >
+                                    <CheckCircle className="w-3.5 h-3.5 mr-1" />{" "}
                                     Duyệt
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button size="sm" variant="destructive">
-                                  <XCircle className="w-3.5 h-3.5 mr-1" /> Từ
-                                  chối
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>
-                                    Từ chối tài khoản?
-                                  </AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Người dùng sẽ không thể đăng nhập
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Hủy</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleReject(u._id)}
-                                    className="bg-red-500 hover:bg-red-600"
-                                  >
-                                    Từ chối
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      Duyệt tài khoản?
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Người dùng sẽ có thể đăng nhập sau khi
+                                      được duyệt
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Hủy</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleApprove(u._id)}
+                                      className="bg-emerald-500 hover:bg-emerald-600"
+                                    >
+                                      Duyệt
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button size="sm" variant="destructive">
+                                    <XCircle className="w-3.5 h-3.5 mr-1" /> Từ
+                                    chối
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      Từ chối tài khoản?
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Người dùng sẽ không thể đăng nhập
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Hủy</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleReject(u._id)}
+                                      className="bg-red-500 hover:bg-red-600"
+                                    >
+                                      Từ chối
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
 
           {/* All users tab */}
           <TabsContent value="all">
@@ -592,13 +639,31 @@ export default function UsersManagementPage() {
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <Input
-                        placeholder="Tìm theo tên, mã, phòng ban..."
+                        placeholder="Tìm theo tên, mã nhân viên..."
                         value={searchText}
                         onChange={(e) => setSearchText(e.target.value)}
                         className="pl-9"
                       />
                     </div>
                   </div>
+                  {isAdmin && (
+                    <Select
+                      value={selectedFactory}
+                      onValueChange={setSelectedFactory}
+                    >
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Nhà máy" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả nhà máy</SelectItem>
+                        {factories.map((f) => (
+                          <SelectItem key={f._id} value={f._id}>
+                            {f.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <Select value={filterRole} onValueChange={setFilterRole}>
                     <SelectTrigger className="w-[160px]">
                       <SelectValue />
@@ -607,7 +672,9 @@ export default function UsersManagementPage() {
                       <SelectItem value="all">Tất cả vai trò</SelectItem>
                       <SelectItem value="worker">Công nhân</SelectItem>
                       <SelectItem value="supervisor">Giám sát</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
+                      {!isFacManager && (
+                        <SelectItem value="admin">Admin</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                   <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -698,7 +765,14 @@ export default function UsersManagementPage() {
                                   </div>
                                   <div className="text-xs text-slate-500">
                                     {u.code}{" "}
-                                    {u.department && `• ${u.department}`}
+                                    {u.factoryId &&
+                                      ` • 🏭 ${
+                                        typeof u.factoryId === "object"
+                                          ? u.factoryId.name
+                                          : factories.find(
+                                              (f) => f._id === u.factoryId,
+                                            )?.name || u.factoryId
+                                      }`}
                                   </div>
                                 </div>
                               </div>
@@ -742,49 +816,55 @@ export default function UsersManagementPage() {
                                     Lịch sử làm việc
                                   </TooltipContent>
                                 </Tooltip>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="h-8 w-8"
-                                      onClick={() => openEdit(u)}
-                                    >
-                                      <Pencil className="w-4 h-4" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Chỉnh sửa</TooltipContent>
-                                </Tooltip>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="h-8 w-8 text-red-500 hover:text-red-600"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>
-                                        Xóa người dùng này?
-                                      </AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Hành động này không thể hoàn tác
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Hủy</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => handleDelete(u._id)}
-                                        className="bg-red-500 hover:bg-red-600"
-                                      >
-                                        Xóa
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
+                                {!isFacManager && (
+                                  <>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="h-8 w-8"
+                                          onClick={() => openEdit(u)}
+                                        >
+                                          <Pencil className="w-4 h-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Chỉnh sửa</TooltipContent>
+                                    </Tooltip>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="h-8 w-8 text-red-500 hover:text-red-600"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>
+                                            Xóa người dùng này?
+                                          </AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Hành động này không thể hoàn tác
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>
+                                            Hủy
+                                          </AlertDialogCancel>
+                                          <AlertDialogAction
+                                            onClick={() => handleDelete(u._id)}
+                                            className="bg-red-500 hover:bg-red-600"
+                                          >
+                                            Xóa
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -828,9 +908,13 @@ export default function UsersManagementPage() {
                             <div className="text-xs text-slate-500">
                               {u.code}
                             </div>
-                            {u.department && (
-                              <div className="text-xs text-slate-400">
-                                {u.department}
+                            {u.factoryId && (
+                              <div className="text-xs text-slate-400 flex items-center gap-1 mt-1">
+                                <span>🏭</span>{" "}
+                                {typeof u.factoryId === "object"
+                                  ? u.factoryId.name
+                                  : factories.find((f) => f._id === u.factoryId)
+                                      ?.name || u.factoryId}
                               </div>
                             )}
                           </div>
@@ -853,44 +937,48 @@ export default function UsersManagementPage() {
                           >
                             <History className="w-3.5 h-3.5 mr-1" /> Lịch sử
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 text-xs"
-                            onClick={() => openEdit(u)}
-                          >
-                            <Pencil className="w-3.5 h-3.5 mr-1" /> Sửa
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
+                          {!isFacManager && (
+                            <>
                               <Button
-                                size="icon"
+                                size="sm"
                                 variant="ghost"
-                                className="h-8 w-8 text-red-500"
+                                className="h-8 text-xs"
+                                onClick={() => openEdit(u)}
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Pencil className="w-3.5 h-3.5 mr-1" /> Sửa
                               </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                  Xóa người dùng này?
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Hành động này không thể hoàn tác
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Hủy</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(u._id)}
-                                  className="bg-red-500 hover:bg-red-600"
-                                >
-                                  Xóa
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 text-red-500"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      Xóa người dùng này?
+                                    </AlertDialogTitle>
+                                  </AlertDialogHeader>
+                                  <AlertDialogDescription>
+                                    Hành động này không thể hoàn tác
+                                  </AlertDialogDescription>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Hủy</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDelete(u._id)}
+                                      className="bg-red-500 hover:bg-red-600"
+                                    >
+                                      Xóa
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -959,14 +1047,26 @@ export default function UsersManagementPage() {
                       setFormData({ ...formData, role: v });
                       if (!editingUser) fetchNextCode(v);
                     }}
+                    disabled={isFacManager && !editingUser}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn vai trò" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="worker">👷 Công nhân</SelectItem>
-                      <SelectItem value="supervisor">👔 Giám sát</SelectItem>
-                      <SelectItem value="admin">👑 Admin</SelectItem>
+                      {isAdmin && (
+                        <>
+                          <SelectItem value="admin">
+                            Quản trị viên (Admin)
+                          </SelectItem>
+                          <SelectItem value="fac_manager">
+                            Quản lý nhà máy
+                          </SelectItem>
+                          <SelectItem value="supervisor">
+                            Giám sát sản xuất
+                          </SelectItem>
+                        </>
+                      )}
+                      <SelectItem value="worker">Công nhân</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -980,6 +1080,40 @@ export default function UsersManagementPage() {
                     setFormData({ ...formData, name: e.target.value })
                   }
                   placeholder="Nguyễn Văn A"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label>Năm sinh</Label>
+                  <Input
+                    type="date"
+                    value={formData.dateOfBirth}
+                    onChange={(e) =>
+                      setFormData({ ...formData, dateOfBirth: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>CCCD</Label>
+                  <Input
+                    value={formData.citizenId}
+                    onChange={(e) =>
+                      setFormData({ ...formData, citizenId: e.target.value })
+                    }
+                    placeholder="Số CCCD"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Địa chỉ</Label>
+                <Input
+                  value={formData.address}
+                  onChange={(e) =>
+                    setFormData({ ...formData, address: e.target.value })
+                  }
+                  placeholder="Địa chỉ thường trú"
                 />
               </div>
 
@@ -1012,26 +1146,37 @@ export default function UsersManagementPage() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label>Phòng ban</Label>
-                <Select
-                  value={formData.department}
-                  onValueChange={(v) =>
-                    setFormData({ ...formData, department: v })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn hoặc nhập phòng ban" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept} value={dept}>
-                        {dept}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {(!isFacManager || formData.factoryId) && (
+                <div className="space-y-1.5">
+                  <Label>
+                    Nhà máy{" "}
+                    {isFacManager ? "" : "(Bắt buộc cho Giám sát/Công nhân)"}
+                  </Label>
+                  <Select
+                    value={formData.factoryId}
+                    onValueChange={(v) =>
+                      setFormData({ ...formData, factoryId: v })
+                    }
+                    disabled={isFacManager}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn nhà máy" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {!isFacManager && (
+                        <SelectItem value="none">
+                          Không gán (Chỉ dành cho Admin tổng)
+                        </SelectItem>
+                      )}
+                      {factories.map((f) => (
+                        <SelectItem key={f._id} value={f._id}>
+                          🏭 {f.name} ({f.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {editingUser && (
                 <div className="flex items-center justify-between">

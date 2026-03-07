@@ -15,6 +15,7 @@ import {
 } from "react";
 import { getMe, login as apiLogin, logout as apiLogout } from "../services/api";
 import type { User } from "../types";
+import Cookies from "js-cookie";
 
 interface AuthContextType {
   user: User | null;
@@ -37,17 +38,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   // Kiểm tra token và user từ localStorage khi mount
   useEffect(() => {
     const checkAuth = () => {
-      const token = localStorage.getItem("token");
-      const userStr = localStorage.getItem("user");
+      // Only the user info is stored in this accessible cookie, the token is HttpOnly.
+      const userStr = Cookies.get("user");
 
-      if (token && userStr) {
+      if (userStr) {
         try {
           const savedUser = JSON.parse(userStr);
           setUser(savedUser);
         } catch {
           // JSON parse error
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
+          Cookies.remove("user");
         }
       }
       setLoading(false);
@@ -55,9 +55,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     checkAuth();
 
-    // Lắng nghe thay đổi từ localStorage (từ Redux authSlice)
+    // Since Cookies don't fire "storage" events on the same window,
+    // we use a custom event to sync across components/tabs if needed.
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "token" || e.key === "user") {
+      if (e.key === "user") {
         checkAuth();
       }
     };
@@ -79,14 +80,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const login = async (code: string, password: string): Promise<User> => {
     const res = await apiLogin(code, password);
     const { token, user } = res.data.data;
-    localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(user));
-    setUser(user);
+    // Add roleCode helper to the user object for easier access in UI
+    const roleCode = (user.roleId as any)?.code || user.role;
+    const userWithRoleCode = {
+      ...user,
+      roleCode,
+    };
+
+    // Cookie is set by backend, we just update the local context state
+    setUser(userWithRoleCode);
 
     // Dispatch custom event để đồng bộ
     window.dispatchEvent(new Event("auth-changed"));
 
-    return user;
+    return userWithRoleCode;
   };
 
   const logout = async (): Promise<void> => {
@@ -95,8 +102,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } catch {
       // Ignore logout errors
     }
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    // Token is cleared by backend response headers
+    Cookies.remove("user");
     setUser(null);
 
     // Dispatch custom event
@@ -105,9 +112,22 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const updateUser = (updatedUser: Partial<User>) => {
     if (!user) return;
-    const newUser = { ...user, ...updatedUser };
+
+    // Recalculate roleCode if roleId or role changed
+    const roleCode =
+      (updatedUser.roleId as any)?.code ||
+      (user.roleId as any)?.code ||
+      updatedUser.role ||
+      user.role;
+
+    const newUser = {
+      ...user,
+      ...updatedUser,
+      roleCode,
+    };
+
     setUser(newUser);
-    localStorage.setItem("user", JSON.stringify(newUser));
+    Cookies.set("user", JSON.stringify(newUser));
     window.dispatchEvent(new Event("auth-changed"));
   };
 

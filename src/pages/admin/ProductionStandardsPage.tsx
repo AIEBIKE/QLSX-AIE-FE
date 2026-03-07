@@ -61,6 +61,14 @@ export default function ProductionStandardsPage() {
   const [editedStandards, setEditedStandards] = useState<Record<string, any>>(
     {},
   );
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const roleCode = user.roleCode || user.role;
+  const isAdmin = roleCode === "ADMIN" || roleCode === "admin";
+  const isFacManager = roleCode === "FAC_MANAGER" || roleCode === "fac_manager";
+  const isSupervisor = roleCode === "SUPERVISOR" || roleCode === "supervisor";
+
+  const [factories, setFactories] = useState<any[]>([]);
+  const [selectedFactory, setSelectedFactory] = useState<string>("all");
 
   // Form state
   const [formData, setFormData] = useState({
@@ -71,33 +79,42 @@ export default function ProductionStandardsPage() {
   });
 
   useEffect(() => {
-    loadVehicleTypes();
+    const loadInitData = async () => {
+      setLoading(true);
+      try {
+        const [vtRes, fRes] = await Promise.all([
+          api.getVehicleTypes({ active: true }),
+          isAdmin
+            ? api.getFactories()
+            : Promise.resolve({ data: { data: [] } }),
+        ]);
+        const types = vtRes.data.data || [];
+        setVehicleTypes(types);
+        if (types.length > 0) setSelectedVehicleType(types[0]);
+        if (isAdmin) setFactories(fRes.data.data || []);
+      } catch {
+        toast.error("Lỗi tải dữ liệu ban đầu");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadInitData();
   }, []);
+
   useEffect(() => {
     if (selectedVehicleType) {
       loadStandards();
       loadOperationsForVehicleType();
     }
-  }, [selectedVehicleType]);
-
-  const loadVehicleTypes = async () => {
-    try {
-      const res = await api.getVehicleTypes({ active: true });
-      const types = res.data.data || [];
-      setVehicleTypes(types);
-      if (types.length > 0) setSelectedVehicleType(types[0]);
-    } catch {
-      toast.error("Lỗi tải loại xe");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [selectedVehicleType, selectedFactory]);
 
   const loadStandards = async () => {
     try {
-      const res = await api.getProductionStandards({
-        vehicleTypeId: selectedVehicleType._id,
-      });
+      const query: any = { vehicleTypeId: selectedVehicleType._id };
+      if (selectedFactory !== "all") {
+        query.factoryId = selectedFactory;
+      }
+      const res = await api.getProductionStandards(query);
       setStandards(res.data.data || []);
       setEditedStandards({});
       setHasChanges(false);
@@ -136,7 +153,7 @@ export default function ProductionStandardsPage() {
         bonusPerUnit: Number(formData.bonusPerUnit) || 0,
         penaltyPerUnit: Number(formData.penaltyPerUnit) || 0,
       };
-      await api.createProductionStandard(data);
+      await api.createProductionStandard(data as any);
       toast.success("Thêm thành công");
       setModalOpen(false);
       setFormData({
@@ -162,7 +179,7 @@ export default function ProductionStandardsPage() {
   const handleSaveChanges = async () => {
     try {
       const updates = Object.entries(editedStandards).map(([id, changes]) =>
-        api.updateProductionStandard(id, changes),
+        api.updateProductionStandard(id, changes as any),
       );
       await Promise.all(updates);
       toast.success("Lưu thành công!");
@@ -270,6 +287,29 @@ export default function ProductionStandardsPage() {
       <Card className="mb-6 border-slate-200">
         <CardContent className="pt-5">
           <div className="flex gap-4 items-end flex-wrap">
+            {isAdmin && (
+              <div>
+                <Label className="text-[11px] uppercase text-slate-500 mb-1 block">
+                  Nhà máy
+                </Label>
+                <Select
+                  value={selectedFactory}
+                  onValueChange={setSelectedFactory}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Tất cả nhà máy" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả nhà máy</SelectItem>
+                    {factories.map((f) => (
+                      <SelectItem key={f._id} value={f._id}>
+                        {f.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label className="text-[11px] uppercase text-slate-500 mb-1 block">
                 Loại xe
@@ -310,7 +350,7 @@ export default function ProductionStandardsPage() {
                 <RefreshCw className="w-4 h-4 mr-1" /> Đặt lại
               </Button>
               <Button
-                disabled={!hasChanges}
+                disabled={!hasChanges || !isFacManager}
                 onClick={handleSaveChanges}
                 className="bg-[#0077c0] hover:bg-[#005fa3]"
               >
@@ -360,20 +400,22 @@ export default function ProductionStandardsPage() {
                       className="text-center py-10 text-slate-400"
                     >
                       Chưa có định mức.{" "}
-                      <button
-                        className="text-[#0077c0] hover:underline"
-                        onClick={() => {
-                          setFormData({
-                            operationId: "",
-                            expectedQuantity: 1,
-                            bonusPerUnit: 0,
-                            penaltyPerUnit: 0,
-                          });
-                          setModalOpen(true);
-                        }}
-                      >
-                        <Plus className="w-3 h-3 inline mr-0.5" /> Thêm mới
-                      </button>
+                      {isFacManager && (
+                        <button
+                          className="text-[#0077c0] hover:underline"
+                          onClick={() => {
+                            setFormData({
+                              operationId: "",
+                              expectedQuantity: 1,
+                              bonusPerUnit: 0,
+                              penaltyPerUnit: 0,
+                            });
+                            setModalOpen(true);
+                          }}
+                        >
+                          <Plus className="w-3 h-3 inline mr-0.5" /> Thêm mới
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ) : (
@@ -419,6 +461,7 @@ export default function ProductionStandardsPage() {
                             <Input
                               type="number"
                               min={0}
+                              disabled={!isFacManager}
                               className="w-[100px] text-center border-emerald-200 bg-emerald-50/50"
                               value={
                                 currentValues.bonusPerUnit ??
@@ -441,6 +484,7 @@ export default function ProductionStandardsPage() {
                             <Input
                               type="number"
                               min={0}
+                              disabled={!isFacManager}
                               className="w-[100px] text-center border-red-200 bg-red-50/50"
                               value={
                                 currentValues.penaltyPerUnit ??
@@ -458,36 +502,38 @@ export default function ProductionStandardsPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-red-500 opacity-50 hover:opacity-100"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                  Xóa định mức này?
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Hành động không thể hoàn tác.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Hủy</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(std._id)}
-                                  className="bg-red-500 hover:bg-red-600"
+                          {isFacManager && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-red-500 opacity-50 hover:opacity-100"
                                 >
-                                  Xóa
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Xóa định mức này?
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Hành động không thể hoàn tác.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Hủy</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDelete(std._id)}
+                                    className="bg-red-500 hover:bg-red-600"
+                                  >
+                                    Xóa
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </td>
                       </tr>
                     );

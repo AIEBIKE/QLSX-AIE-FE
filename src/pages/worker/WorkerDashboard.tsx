@@ -74,6 +74,24 @@ export default function WorkerDashboard() {
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
   const [selectedProcess, setSelectedProcess] = useState("all");
+  const [isOutOfTime, setIsOutOfTime] = useState(false);
+
+  useEffect(() => {
+    const checkTime = () => {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const currentTime = currentHour * 60 + currentMinute;
+      const startTimeLimit = 6 * 60 + 30; // 06:30
+      const endTimeLimit = 17 * 60; // 17:00
+      setIsOutOfTime(
+        currentTime < startTimeLimit || currentTime > endTimeLimit,
+      );
+    };
+    checkTime();
+    const timer = setInterval(checkTime, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -85,10 +103,11 @@ export default function WorkerDashboard() {
         api.getCurrentOrderWithOperations(),
         api.getTodayRegistrations(),
       ]);
-      if (orderRes.data.data) {
-        setActiveOrder(orderRes.data.data.order);
-        setProcesses(orderRes.data.data.processes || []);
-        setOperations(orderRes.data.data.operations || []);
+      const data = orderRes.data.data as any;
+      if (data) {
+        setActiveOrder(data.order);
+        setProcesses(data.processes || []);
+        setOperations(data.operations || []);
       }
       setTodayRegistrations(regRes.data.data || []);
     } catch (err) {
@@ -140,6 +159,19 @@ export default function WorkerDashboard() {
 
   return (
     <div className="max-w-[1200px] mx-auto">
+      {/* Time Window Warning */}
+      {isOutOfTime && (
+        <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-6 rounded-r-lg shadow-sm">
+          <div className="flex items-center">
+            <AlertTriangle className="h-5 w-5 text-amber-500 mr-3" />
+            <p className="text-sm text-amber-800">
+              Hệ thống chỉ mở đăng ký từ{" "}
+              <span className="font-bold">06:30 đến 17:00</span>. Hiện tại ngoài
+              khung giờ quy định.
+            </p>
+          </div>
+        </div>
+      )}
       {/* Production Order Header */}
       {activeOrder ? (
         <Card className="mb-6 border-slate-200">
@@ -419,9 +451,10 @@ export default function WorkerDashboard() {
                           <Button
                             className="w-full bg-[#0077c0] hover:bg-[#005f9e]"
                             onClick={() => handleRegister(op._id)}
-                            disabled={registering}
+                            disabled={registering || isOutOfTime}
                           >
-                            <ChevronRight className="w-4 h-4 mr-1" /> Đăng ký →
+                            <ChevronRight className="w-4 h-4 mr-1" />{" "}
+                            {isOutOfTime ? "Ngoài giờ" : "Đăng ký →"}
                           </Button>
                         ) : (
                           <Button className="w-full" disabled variant="outline">

@@ -58,7 +58,6 @@ export const UserList = () => (
     <Datagrid rowClick="edit">
       <TextField source="code" label="Mã NV" />
       <TextField source="name" label="Họ tên" />
-      <TextField source="department" label="Bộ phận" />
       <RoleField source="role" />
       <BooleanField source="active" label="Hoạt động" />
       <EditButton />
@@ -70,9 +69,7 @@ export const UserCreate = () => (
   <Create>
     <SimpleForm>
       <TextInput source="code" label="Mã nhân viên" validate={required()} />
-      <TextInput source="name" label="Họ tên" validate={required()} />
       <PasswordInput source="password" label="Mật khẩu" validate={required()} />
-      <TextInput source="department" label="Bộ phận" />
       <SelectInput
         source="role"
         label="Vai trò"
@@ -87,12 +84,10 @@ export const UserEdit = () => (
   <Edit>
     <SimpleForm>
       <TextInput source="code" label="Mã nhân viên" disabled />
-      <TextInput source="name" label="Họ tên" validate={required()} />
       <PasswordInput
         source="password"
         label="Mật khẩu mới (bỏ trống nếu không đổi)"
       />
-      <TextInput source="department" label="Bộ phận" />
       <SelectInput source="role" label="Vai trò" choices={roleChoices} />
       <BooleanInput source="active" label="Hoạt động" />
     </SimpleForm>

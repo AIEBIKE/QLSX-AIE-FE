@@ -45,9 +45,9 @@ export default function AdminDashboard() {
       ).length;
 
       setStats({
-        vehicleTypes: vehicleTypesRes.data.count || 0,
+        vehicleTypes: (vehicleTypesRes.data as any).count || 0,
         activeOrder: activeOrderRes.data.data,
-        todayRegistrations: registrationsRes.data.count || 0,
+        todayRegistrations: (registrationsRes.data as any).count || 0,
         completedRegistrations: completed,
       });
     } catch (error) {

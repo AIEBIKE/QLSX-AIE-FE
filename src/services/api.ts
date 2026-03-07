@@ -11,6 +11,8 @@ import type {
   Shift,
   BonusRule,
   LoginResponse,
+  Factory,
+  QualityControl,
 } from "../types";
 
 const API_URL = "/api";
@@ -20,24 +22,19 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true,
 });
 
-// Thêm token vào mỗi request
-api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+import Cookies from "js-cookie";
+
+// Không cần thêm token auth header thủ công nữa vì đã dùng HttpOnly cookie
 
 // Xử lý lỗi response
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      Cookies.remove("user"); // Xóa cookie user
       window.location.href = "/login";
     }
     return Promise.reject(error);
@@ -57,7 +54,9 @@ export const logout = (): Promise<AxiosResponse<ApiResponse<null>>> =>
 export const updateProfile = (data: {
   name: string;
   email?: string;
-  department?: string;
+  dateOfBirth?: string;
+  citizenId?: string;
+  address?: string;
 }): Promise<AxiosResponse<ApiResponse<User>>> => api.put("/auth/profile", data);
 export const changePassword = (data: {
   currentPassword: string;
@@ -246,8 +245,9 @@ export const assignWorkerToOrder = (
   api.post(`/production-orders/${id}/assign-worker`, data);
 
 // Users Management
-export const getUsers = (): Promise<AxiosResponse<ApiResponse<User[]>>> =>
-  api.get("/auth/users");
+export const getUsers = (params?: Record<string, unknown>): Promise<AxiosResponse<ApiResponse<User[]>>> =>
+  api.get("/auth/users", { params });
+
 export const getUser = (
   id: string,
 ): Promise<AxiosResponse<ApiResponse<User>>> => api.get(`/auth/users/${id}`);
@@ -292,5 +292,27 @@ export const getWorkerSalary = (
   params?: Record<string, unknown>,
 ): Promise<AxiosResponse<ApiResponse<unknown>>> =>
   api.get("/registrations/salary", { params });
+
+// Factories
+export const getFactories = (): Promise<AxiosResponse<ApiResponse<Factory[]>>> =>
+  api.get("/factories");
+export const createFactory = (data: Partial<Factory>): Promise<AxiosResponse<ApiResponse<Factory>>> =>
+  api.post("/factories", data);
+export const updateFactory = (id: string, data: Partial<Factory>): Promise<AxiosResponse<ApiResponse<Factory>>> =>
+  api.put(`/factories/${id}`, data);
+export const deleteFactory = (id: string): Promise<AxiosResponse<ApiResponse<null>>> =>
+  api.delete(`/factories/${id}`);
+
+// Quality Control (QC)
+export const inspectVehicle = (data: any): Promise<AxiosResponse<ApiResponse<QualityControl>>> =>
+  api.post("/qc/inspect", data);
+export const getQCReport = (orderId: string): Promise<AxiosResponse<ApiResponse<QualityControl[]>>> =>
+  api.get(`/qc/order/${orderId}`);
+export const getVehicleQC = (frameNumber: string): Promise<AxiosResponse<ApiResponse<QualityControl>>> =>
+  api.get(`/qc/vehicle/${frameNumber}`);
+
+// Reassign (Supervisor only)
+export const reassignRegistration = (id: string, data: { newUserId: string; note?: string }): Promise<AxiosResponse<ApiResponse<Registration>>> =>
+  api.post(`/registrations/${id}/reassign`, data);
 
 export default api;

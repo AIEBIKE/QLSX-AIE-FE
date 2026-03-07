@@ -98,6 +98,7 @@ export default function ProductionOrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [order, setOrder] = useState<any>(null);
   const [progress, setProgress] = useState<any[]>([]);
+  const [registrations, setRegistrations] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignLoading, setAssignLoading] = useState(false);
@@ -106,6 +107,10 @@ export default function ProductionOrderDetailPage() {
   const [compCheck, setCompCheck] = useState<any>(null);
   const [forceOpen, setForceOpen] = useState(false);
   const [forceMsg, setForceMsg] = useState("");
+  const [reassignOpen, setReassignOpen] = useState(false);
+  const [selectedReg, setSelectedReg] = useState<any>(null);
+  const [reassignUserId, setReassignUserId] = useState("");
+  const [reassignLoading, setReassignLoading] = useState(false);
   const [assignForm, setAssignForm] = useState({
     userId: "",
     operationId: "",
@@ -114,6 +119,7 @@ export default function ProductionOrderDetailPage() {
   });
 
   const loadData = useCallback(async () => {
+    if (!id) return;
     try {
       setLoading(true);
       const [oRes, pRes] = await Promise.all([
@@ -121,8 +127,10 @@ export default function ProductionOrderDetailPage() {
         api.getOrderProgress(id),
       ]);
       setOrder(oRes.data.data);
-      setProgress(pRes.data.data.progress);
-      setSummary(pRes.data.data.summary);
+      const progressData = pRes.data.data as any;
+      setProgress(progressData.progress);
+      setRegistrations(progressData.registrations || []);
+      setSummary(progressData.summary);
     } catch (e: any) {
       toast.error("Lỗi tải dữ liệu: " + e.message);
     } finally {
@@ -145,13 +153,15 @@ export default function ProductionOrderDetailPage() {
   };
 
   const handleCheckCompletion = async () => {
+    if (!id) return;
     try {
       const res = await api.checkOrderCompletion(id);
-      setCompCheck(res.data.data);
-      res.data.data.canComplete
+      const checkData = res.data.data as any;
+      setCompCheck(checkData);
+      checkData.canComplete
         ? toast.success("Có thể hoàn thành!")
         : toast.warning(
-            `Còn ${res.data.data.incompleteProcesses.length} công đoạn chưa xong`,
+            `Còn ${checkData.incompleteProcesses.length} công đoạn chưa xong`,
           );
     } catch (e: any) {
       toast.error(e.message);
@@ -159,6 +169,7 @@ export default function ProductionOrderDetailPage() {
   };
 
   const handleComplete = async () => {
+    if (!id) return;
     try {
       await api.completeOrder(id, { forceComplete: false });
       toast.success("Đã hoàn thành!");
@@ -172,6 +183,7 @@ export default function ProductionOrderDetailPage() {
   };
 
   const handleForce = async () => {
+    if (!id) return;
     await api.completeOrder(id, { forceComplete: true });
     toast.success("Đã ép hoàn thành!");
     setForceOpen(false);
@@ -179,10 +191,11 @@ export default function ProductionOrderDetailPage() {
   };
 
   const handleAssign = async () => {
+    if (!id) return;
     try {
       setAssignLoading(true);
       await api.assignWorkerToOrder(id, {
-        ...assignForm,
+        ...(assignForm as any),
         expectedQuantity: Number(assignForm.expectedQuantity),
       });
       toast.success("Đã bổ sung!");
@@ -198,6 +211,26 @@ export default function ProductionOrderDetailPage() {
       toast.error(e.response?.data?.error?.message || e.message);
     } finally {
       setAssignLoading(false);
+    }
+  };
+
+  const handleReassign = async () => {
+    if (!selectedReg || !reassignUserId) return;
+    try {
+      setReassignLoading(true);
+      await api.reassignRegistration(selectedReg._id, {
+        newUserId: reassignUserId,
+        note: "Thay thế do nghỉ đột xuất",
+      });
+      toast.success("Đã thay thế công nhân!");
+      setReassignOpen(false);
+      setSelectedReg(null);
+      setReassignUserId("");
+      loadData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error?.message || "Lỗi khi thay thế");
+    } finally {
+      setReassignLoading(false);
     }
   };
 
@@ -247,6 +280,14 @@ export default function ProductionOrderDetailPage() {
               </div>
               <p className="text-sm text-slate-500">
                 {order?.vehicleTypeId?.name} • {order?.vehicleTypeId?.code}
+                {order?.factoryId && (
+                  <span className="block text-[#0077c0] font-medium mt-1">
+                    🏭 Nhà máy:{" "}
+                    {typeof order.factoryId === "object"
+                      ? order.factoryId.name
+                      : order.factoryId}
+                  </span>
+                )}
               </p>
             </div>
             <Button
@@ -457,6 +498,88 @@ export default function ProductionOrderDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Active Registrations Table */}
+      <Card className="mt-6 border-slate-200">
+        <CardContent className="pt-6">
+          <h3 className="text-lg font-bold mb-5">
+            Danh sách đăng ký & Thay thế
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left">
+                  <th className="py-3 font-medium text-slate-500">CÔNG NHÂN</th>
+                  <th className="py-3 font-medium text-slate-500">THAO TÁC</th>
+                  <th className="py-3 font-medium text-slate-500">
+                    SL ĐĂNG KÝ
+                  </th>
+                  <th className="py-3 font-medium text-slate-500">
+                    TRẠNG THÁI
+                  </th>
+                  <th className="py-3 font-medium text-slate-500 text-right">
+                    THAO TÁC
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {registrations.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-6 text-center text-slate-400">
+                      Chưa có lượt đăng ký nào
+                    </td>
+                  </tr>
+                ) : (
+                  registrations.map((reg) => (
+                    <tr
+                      key={reg._id}
+                      className="border-b border-slate-100 hover:bg-slate-50"
+                    >
+                      <td className="py-3 font-medium">
+                        {reg.userId?.name} ({reg.userId?.code})
+                      </td>
+                      <td className="py-3">{reg.operationId?.name}</td>
+                      <td className="py-3">{reg.expectedQuantity}</td>
+                      <td className="py-3">
+                        <Badge
+                          variant="outline"
+                          className={
+                            reg.status === "completed"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-blue-100 text-blue-700"
+                          }
+                        >
+                          {reg.status === "completed"
+                            ? "Xong"
+                            : reg.status === "registered"
+                              ? "Đang làm"
+                              : reg.status}
+                        </Badge>
+                      </td>
+                      <td className="py-3 text-right">
+                        {reg.status === "registered" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-amber-600 border-amber-200 hover:bg-amber-50"
+                            onClick={() => {
+                              setSelectedReg(reg);
+                              setReassignOpen(true);
+                              loadUsersOps();
+                            }}
+                          >
+                            <RefreshCw className="w-3.5 h-3.5 mr-1" /> Thay thế
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Force Complete */}
       <AlertDialog open={forceOpen} onOpenChange={setForceOpen}>
         <AlertDialogContent>
@@ -573,6 +696,78 @@ export default function ProductionOrderDetailPage() {
                 <Loader2 className="w-4 h-4 animate-spin mr-1" />
               )}
               Bổ sung
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reassign Modal */}
+      <Dialog
+        open={reassignOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setReassignOpen(false);
+            setSelectedReg(null);
+            setReassignUserId("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Thay thế công nhân</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2 text-sm">
+            <div className="p-3 bg-amber-50 rounded-lg border border-amber-100">
+              <p>
+                📌 <strong>Đang làm:</strong> {selectedReg?.userId?.name} (
+                {selectedReg?.userId?.code})
+              </p>
+              <p>
+                ⚙️ <strong>Thao tác:</strong> {selectedReg?.operationId?.name}
+              </p>
+              <p>
+                📦 <strong>Sản lượng:</strong> {selectedReg?.expectedQuantity}
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Công nhân mới *</Label>
+              <Select value={reassignUserId} onValueChange={setReassignUserId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn người thay thế..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {users
+                    .filter(
+                      (u) =>
+                        u.role === "worker" &&
+                        u._id !== selectedReg?.userId?._id,
+                    )
+                    .map((u) => (
+                      <SelectItem key={u._id} value={u._id}>
+                        {u.code} - {u.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-slate-500 italic">
+              * Hệ thống sẽ tính toán sản lượng còn lại và gán cho công nhân
+              mới. Công nhân cũ sẽ bị dừng thao tác này.
+            </p>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setReassignOpen(false)}>
+              Hủy
+            </Button>
+            <Button
+              onClick={handleReassign}
+              disabled={reassignLoading || !reassignUserId}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {reassignLoading && (
+                <Loader2 className="w-4 h-4 animate-spin mr-1" />
+              )}
+              Xác nhận thay thế
             </Button>
           </DialogFooter>
         </DialogContent>

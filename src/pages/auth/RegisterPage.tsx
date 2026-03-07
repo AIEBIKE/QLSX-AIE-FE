@@ -49,10 +49,11 @@ export default function RegisterPage() {
   const navigate = useNavigate();
 
   const [name, setName] = useState("");
-  const [role, setRole] = useState<"worker" | "supervisor" | "admin">("worker");
+  const [role, setRole] = useState<
+    "worker" | "supervisor" | "admin" | "fac_manager"
+  >("worker");
   const [code, setCode] = useState("");
   const [email, setEmail] = useState("");
-  const [department, setDepartment] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -123,7 +124,6 @@ export default function RegisterPage() {
       name: name.trim(),
       code: code.trim() || undefined,
       email: email.trim() || undefined,
-      department: department.trim() || undefined,
       password,
       role,
     });
@@ -233,7 +233,9 @@ export default function RegisterPage() {
                   <Select
                     value={role}
                     onValueChange={(v) =>
-                      setRole(v as "worker" | "supervisor" | "admin")
+                      setRole(
+                        v as "worker" | "supervisor" | "admin" | "fac_manager",
+                      )
                     }
                     disabled={registerMutation.isPending}
                   >
@@ -241,9 +243,12 @@ export default function RegisterPage() {
                       <SelectValue placeholder="Chọn vai trò" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="worker">👷 Công nhân</SelectItem>
-                      <SelectItem value="supervisor">👔 Giám sát</SelectItem>
                       <SelectItem value="admin">👑 Admin</SelectItem>
+                      <SelectItem value="fac_manager">
+                        🏭 Quản lý nhà máy
+                      </SelectItem>
+                      <SelectItem value="supervisor">👔 Giám sát</SelectItem>
+                      <SelectItem value="worker">👷 Công nhân</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -278,18 +283,6 @@ export default function RegisterPage() {
                 <p className="text-xs text-muted-foreground">
                   Dùng để khôi phục mật khẩu
                 </p>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="department">Phòng ban / Xưởng</Label>
-                <Input
-                  id="department"
-                  type="text"
-                  placeholder="VD: Xưởng lắp ráp"
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  disabled={registerMutation.isPending}
-                />
               </div>
 
               <div className="space-y-1.5">
