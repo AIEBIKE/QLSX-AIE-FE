@@ -56,6 +56,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import * as api from "../../services/api";
+import { useAuth } from "../../contexts/AuthContext";
 
 const statusMap: Record<string, { label: string; className: string }> = {
   pending: {
@@ -78,16 +79,26 @@ const statusMap: Record<string, { label: string; className: string }> = {
 
 export default function ProductionOrdersPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [orders, setOrders] = useState<any[]>([]);
   const [vehicleTypes, setVehicleTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [detailModal, setDetailModal] = useState<any>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [factories, setFactories] = useState<any[]>([]);
+  const [selectedFactory, setSelectedFactory] = useState<string>("all");
+
+  // Lấy role từ user context (đã được normalizeUser xử lý)
+  const roleCode = (user as any)?.roleCode || user?.role;
+  const isAdmin = roleCode === "ADMIN" || roleCode === "admin";
+  const isFacManager = roleCode === "FAC_MANAGER" || roleCode === "fac_manager";
+  const isSupervisor = roleCode === "SUPERVISOR" || roleCode === "supervisor";
 
   // Form state
   const [formData, setFormData] = useState({
     vehicleTypeId: "",
+    factoryId: "",
     quantity: 1,
     startDate: dayjs().format("YYYY-MM-DD"),
     expectedEndDate: "",
@@ -97,6 +108,9 @@ export default function ProductionOrdersPage() {
 
   useEffect(() => {
     loadData();
+  }, [selectedFactory]);
+
+  useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener("resize", checkMobile);
@@ -105,12 +119,16 @@ export default function ProductionOrdersPage() {
 
   const loadData = async () => {
     try {
-      const [ordersRes, vtRes] = await Promise.all([
-        api.getProductionOrders(),
+      const [ordersRes, vtRes, fRes] = await Promise.all([
+        api.getProductionOrders(
+          selectedFactory !== "all" ? { factoryId: selectedFactory } : {},
+        ),
         api.getVehicleTypes({ active: true }),
+        isAdmin ? api.getFactories() : Promise.resolve({ data: { data: [] } }),
       ]);
       setOrders(ordersRes.data.data || []);
       setVehicleTypes(vtRes.data.data || []);
+      if (isAdmin) setFactories((fRes as any).data.data || []);
     } catch {
       toast.error("Lỗi tải dữ liệu");
     } finally {
@@ -123,6 +141,7 @@ export default function ProductionOrdersPage() {
       const data = {
         ...formData,
         quantity: Number(formData.quantity),
+        factoryId: isAdmin ? formData.factoryId : undefined,
         frameNumbers: formData.frameNumbers
           ? formData.frameNumbers.split("\n").filter(Boolean)
           : [],
@@ -136,6 +155,7 @@ export default function ProductionOrdersPage() {
       setModalOpen(false);
       setFormData({
         vehicleTypeId: "",
+        factoryId: "",
         quantity: 1,
         startDate: dayjs().format("YYYY-MM-DD"),
         expectedEndDate: "",
@@ -181,12 +201,34 @@ export default function ProductionOrdersPage() {
       <div>
         <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
           <h2 className="text-xl font-bold text-slate-800">📋 Lệnh Sản Xuất</h2>
-          <Button
-            onClick={() => setModalOpen(true)}
-            className="bg-[#0077c0] hover:bg-[#005fa3]"
-          >
-            <Plus className="w-4 h-4 mr-1" /> Tạo
-          </Button>
+          <div className="flex gap-2 items-center">
+            {isAdmin && (
+              <Select
+                value={selectedFactory}
+                onValueChange={setSelectedFactory}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Tất cả nhà máy" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả nhà máy</SelectItem>
+                  {factories.map((f) => (
+                    <SelectItem key={f._id} value={f._id}>
+                      🏭 {f.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {isFacManager && (
+              <Button
+                onClick={() => setModalOpen(true)}
+                className="bg-[#0077c0] hover:bg-[#005fa3]"
+              >
+                <Plus className="w-4 h-4 mr-1" /> Tạo
+              </Button>
+            )}
+          </div>
         </div>
 
         {isMobile ? (
@@ -225,7 +267,7 @@ export default function ProductionOrdersPage() {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 pt-3 border-t border-slate-100">
-                      {order.status === "pending" && (
+                      {isFacManager && order.status === "pending" && (
                         <Button
                           size="sm"
                           className="bg-[#0077c0] hover:bg-[#005fa3]"
@@ -236,7 +278,7 @@ export default function ProductionOrdersPage() {
                           <Play className="w-3.5 h-3.5 mr-1" /> Bắt đầu
                         </Button>
                       )}
-                      {order.status === "in_progress" && (
+                      {isFacManager && order.status === "in_progress" && (
                         <Button
                           size="sm"
                           className="bg-emerald-500 hover:bg-emerald-600"
@@ -255,7 +297,8 @@ export default function ProductionOrdersPage() {
                       >
                         <Maximize2 className="w-3.5 h-3.5 mr-1" /> Chi tiết
                       </Button>
-                      {order.status !== "in_progress" &&
+                      {isFacManager &&
+                        order.status !== "in_progress" &&
                         order.status !== "completed" && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -304,6 +347,7 @@ export default function ProductionOrdersPage() {
                   <TableHead>Loại xe</TableHead>
                   <TableHead className="text-center w-[60px]">SL</TableHead>
                   <TableHead className="w-[80px]">Ngày</TableHead>
+                  <TableHead>Nhà máy</TableHead>
                   <TableHead className="w-[130px]">Trạng thái</TableHead>
                   <TableHead className="w-[140px] text-right">
                     Thao tác
@@ -330,6 +374,9 @@ export default function ProductionOrdersPage() {
                       <TableCell>
                         {dayjs(order.startDate).format("DD/MM")}
                       </TableCell>
+                      <TableCell className="text-xs text-slate-500">
+                        {order.factoryId?.name || "-"}
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={s.className}>
                           {s.label}
@@ -354,7 +401,7 @@ export default function ProductionOrdersPage() {
                             </TooltipTrigger>
                             <TooltipContent>Xem chi tiết</TooltipContent>
                           </Tooltip>
-                          {order.status === "pending" && (
+                          {isFacManager && order.status === "pending" && (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
@@ -370,7 +417,8 @@ export default function ProductionOrdersPage() {
                               <TooltipContent>Bắt đầu</TooltipContent>
                             </Tooltip>
                           )}
-                          {order.status === "in_progress" && (
+
+                          {isFacManager && order.status === "in_progress" && (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
@@ -386,7 +434,9 @@ export default function ProductionOrdersPage() {
                               <TooltipContent>Hoàn thành</TooltipContent>
                             </Tooltip>
                           )}
-                          {order.status !== "in_progress" &&
+
+                          {isFacManager &&
+                            order.status !== "in_progress" &&
                             order.status !== "completed" && (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
@@ -530,6 +580,30 @@ export default function ProductionOrdersPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {isAdmin && (
+                <div className="space-y-1.5">
+                  <Label>Nhà máy sản xuất *</Label>
+                  <Select
+                    value={formData.factoryId}
+                    onValueChange={(v) =>
+                      setFormData({ ...formData, factoryId: v })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="-- Chọn nhà máy --" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {factories.map((f) => (
+                        <SelectItem key={f._id} value={f._id}>
+                          🏭 {f.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="space-y-1.5">
                 <Label>Số lượng *</Label>
                 <Input
@@ -544,6 +618,7 @@ export default function ProductionOrdersPage() {
                   }
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label>Ngày bắt đầu *</Label>
