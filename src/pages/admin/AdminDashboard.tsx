@@ -117,7 +117,7 @@ export default function AdminDashboard() {
         {statCards.map((stat, i) => (
           <div
             key={i}
-            className={`rounded-xl bg-gradient-to-br ${stat.gradient} p-5 text-white shadow-lg`}
+            className={`rounded-xl bg-linear-to-br ${stat.gradient} p-5 text-white shadow-lg`}
           >
             <div className="flex items-center justify-between mb-3">
               <span className="text-white/80 text-sm font-medium">
