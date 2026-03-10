@@ -76,7 +76,9 @@ const statusMap: Record<string, { label: string; className: string }> = {
 
 export default function ProductionOrdersPage() {
   const navigate = useNavigate();
-  const user = JSON.parse(Cookies.get("user") || "{}");
+  const user = JSON.parse(
+    localStorage.getItem("user") || Cookies.get("user") || "{}",
+  );
   const roleCode = (user.roleCode || user.role || "").toUpperCase();
   const isAdmin = roleCode === "ADMIN";
   const isFacManager = roleCode === "FAC_MANAGER";
@@ -110,6 +112,8 @@ export default function ProductionOrdersPage() {
     note: "",
     frameNumbers: "",
     engineNumbers: "",
+    frameNumberPrefix: "",
+    engineNumberPrefix: "",
   });
 
   useEffect(() => {
@@ -162,7 +166,7 @@ export default function ProductionOrdersPage() {
 
   const handleSubmit = async () => {
     try {
-      const data = {
+      const data: any = {
         ...formData,
         frameNumbers: formData.frameNumbers
           .split("\n")
@@ -173,6 +177,11 @@ export default function ProductionOrdersPage() {
           .map((s) => s.trim())
           .filter(Boolean),
       };
+      // Gửi prefix nếu có (backend sẽ tự sinh)
+      if (formData.frameNumberPrefix)
+        data.frameNumberPrefix = formData.frameNumberPrefix;
+      if (formData.engineNumberPrefix)
+        data.engineNumberPrefix = formData.engineNumberPrefix;
       await api.createProductionOrder(data as any);
       toast.success("Tạo lệnh thành công");
       setModalOpen(false);
@@ -203,6 +212,8 @@ export default function ProductionOrdersPage() {
       note: "",
       frameNumbers: "",
       engineNumbers: "",
+      frameNumberPrefix: "",
+      engineNumberPrefix: "",
     });
   };
 
@@ -592,6 +603,28 @@ export default function ProductionOrdersPage() {
             </div>
 
             <div className="space-y-2">
+              <Label>Prefix số khung (tự sinh)</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={formData.frameNumberPrefix}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      frameNumberPrefix: e.target.value,
+                    })
+                  }
+                  placeholder="VD: XDD"
+                  className="h-10 flex-1"
+                />
+                <span className="text-xs text-slate-400 self-center whitespace-nowrap">
+                  {formData.frameNumberPrefix && formData.quantity > 0
+                    ? `→ ${formData.frameNumberPrefix}-001 ... ${formData.frameNumberPrefix}-${String(formData.quantity).padStart(3, "0")}`
+                    : "Hoặc nhập thủ công bên dưới"}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
               <Label>Danh sách số khung (Mỗi số 1 dòng)</Label>
               <textarea
                 className="w-full min-h-[80px] border border-slate-200 rounded-md p-3 text-sm font-mono resize-none focus:ring-2 focus:ring-[#0077c0]/20 transition-all"
@@ -599,8 +632,35 @@ export default function ProductionOrdersPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, frameNumbers: e.target.value })
                 }
-                placeholder="VD:&#10;XDD-001&#10;XDD-002"
+                placeholder={
+                  formData.frameNumberPrefix
+                    ? "Tự động sinh từ prefix..."
+                    : "VD:\nXDD-001\nXDD-002"
+                }
+                disabled={!!formData.frameNumberPrefix}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Prefix số máy (tự sinh)</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={formData.engineNumberPrefix}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      engineNumberPrefix: e.target.value,
+                    })
+                  }
+                  placeholder="VD: MS"
+                  className="h-10 flex-1"
+                />
+                <span className="text-xs text-slate-400 self-center whitespace-nowrap">
+                  {formData.engineNumberPrefix && formData.quantity > 0
+                    ? `→ ${formData.engineNumberPrefix}-001 ... ${formData.engineNumberPrefix}-${String(formData.quantity).padStart(3, "0")}`
+                    : "Hoặc nhập thủ công bên dưới"}
+                </span>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -611,7 +671,12 @@ export default function ProductionOrdersPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, engineNumbers: e.target.value })
                 }
-                placeholder="VD:&#10;MS-001&#10;MS-002"
+                placeholder={
+                  formData.engineNumberPrefix
+                    ? "Tự động sinh từ prefix..."
+                    : "VD:\nMS-001\nMS-002"
+                }
+                disabled={!!formData.engineNumberPrefix}
               />
             </div>
 
