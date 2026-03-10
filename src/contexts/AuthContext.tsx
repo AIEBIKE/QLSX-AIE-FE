@@ -44,6 +44,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (userStr) {
         try {
           const savedUser = JSON.parse(userStr);
+          // Ensure roleCode is always present
+          if (!savedUser.roleCode) {
+            savedUser.roleCode =
+              (savedUser.roleId as any)?.code || savedUser.role;
+          }
           setUser(savedUser);
         } catch {
           // JSON parse error
@@ -87,8 +92,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       roleCode,
     };
 
-    // Cookie is set by backend, we just update the local context state
+    // Save user to state, cookie AND localStorage so all pages can read roleCode
     setUser(userWithRoleCode);
+    Cookies.set("user", JSON.stringify(userWithRoleCode));
+    localStorage.setItem("user", JSON.stringify(userWithRoleCode));
 
     // Dispatch custom event để đồng bộ
     window.dispatchEvent(new Event("auth-changed"));

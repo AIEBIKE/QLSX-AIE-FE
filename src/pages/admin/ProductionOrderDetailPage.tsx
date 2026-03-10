@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import dayjs from "dayjs";
@@ -19,6 +19,8 @@ import {
   Shield,
   Hammer,
   Loader2,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -115,6 +117,8 @@ export default function ProductionOrderDetailPage() {
   const [compCheck, setCompCheck] = useState<any>(null);
   const [forceOpen, setForceOpen] = useState(false);
   const [forceMsg, setForceMsg] = useState("");
+  const [expandedOp, setExpandedOp] = useState<string | null>(null);
+  const [expandedSubOp, setExpandedSubOp] = useState<string | null>(null);
   const [reassignOpen, setReassignOpen] = useState(false);
   const [selectedReg, setSelectedReg] = useState<any>(null);
   const [reassignUserId, setReassignUserId] = useState("");
@@ -434,70 +438,425 @@ export default function ProductionOrderDetailPage() {
                     label: r.status,
                   };
                   return (
-                    <tr
-                      key={r.processId}
-                      className="border-b border-slate-100 hover:bg-slate-50"
-                    >
-                      <td className="py-3">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-10 h-10 rounded-lg ${ic.bg} ${ic.text} flex items-center justify-center`}
-                          >
-                            {getProcessIcon(r.processName)}
+                    <React.Fragment key={r.processId}>
+                      <tr className="border-b border-slate-100 hover:bg-slate-50">
+                        <td className="py-3">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-10 h-10 rounded-lg ${ic.bg} ${ic.text} flex items-center justify-center`}
+                            >
+                              {getProcessIcon(r.processName)}
+                            </div>
+                            <div>
+                              <div className="font-semibold">
+                                {r.processName}
+                              </div>
+                              <span className="text-xs text-slate-400">
+                                Bước {r.order}
+                              </span>
+                            </div>
                           </div>
-                          <div>
-                            <div className="font-semibold">{r.processName}</div>
-                            <span className="text-xs text-slate-400">
-                              Bước {r.order}
+                        </td>
+                        <td className="py-3">
+                          <div className="flex items-center gap-3 mb-1">
+                            <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${r.status === "completed" ? "bg-emerald-500" : "bg-[#0077c0]"}`}
+                                style={{
+                                  width: `${Math.min(r.percentage, 100)}%`,
+                                }}
+                              />
+                            </div>
+                            <span className="text-sm font-medium min-w-[40px] text-right">
+                              {r.percentage}%
                             </span>
                           </div>
-                        </div>
-                      </td>
-                      <td className="py-3">
-                        <div className="flex items-center gap-3 mb-1">
-                          <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full ${r.status === "completed" ? "bg-emerald-500" : "bg-[#0077c0]"}`}
-                              style={{
-                                width: `${Math.min(r.percentage, 100)}%`,
-                              }}
-                            />
-                          </div>
-                          <span className="text-sm font-medium min-w-[40px] text-right">
-                            {r.percentage}%
-                          </span>
-                        </div>
-                        <span className="text-xs text-slate-400">
-                          {r.completed}/{r.required}
-                        </span>
-                      </td>
-                      <td className="py-3">
-                        {r.workers.length === 0 ? (
                           <span className="text-xs text-slate-400">
-                            Chưa phân công
+                            {r.completed}/{r.required}
                           </span>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-7 w-7">
-                              <AvatarFallback className="bg-[#0077c0] text-white text-xs">
-                                {r.workers[0]?.charAt(0)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="text-sm">{r.workers[0]}</span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-3">
-                        <Badge variant="outline" className={st.cls}>
-                          {st.label}
-                        </Badge>
-                      </td>
-                      <td className="py-3 text-center">
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </td>
-                    </tr>
+                        </td>
+                        <td className="py-3">
+                          {r.workers.length === 0 ? (
+                            <span className="text-xs text-slate-400">
+                              Chưa phân công
+                            </span>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-7 w-7">
+                                <AvatarFallback className="bg-[#0077c0] text-white text-xs">
+                                  {r.workers[0]?.charAt(0)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm">{r.workers[0]}</span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3">
+                          <Badge variant="outline" className={st.cls}>
+                            {st.label}
+                          </Badge>
+                        </td>
+                        <td className="py-3 text-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-8 w-8 ${expandedOp === r.processId ? "bg-[#0077c0]/10 text-[#0077c0]" : ""}`}
+                            onClick={() =>
+                              setExpandedOp(
+                                expandedOp === r.processId ? null : r.processId,
+                              )
+                            }
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                      {expandedOp === r.processId && (
+                        <tr>
+                          <td colSpan={5} className="bg-slate-50 px-6 py-3">
+                            <div className="text-xs font-semibold text-slate-500 mb-2">
+                              Chi tiết – {r.processName}
+                            </div>
+                            {(() => {
+                              const opRegs = r.registrationDetails || [];
+                              if (opRegs.length === 0) {
+                                return (
+                                  <p className="text-xs text-slate-400">
+                                    Chưa có công nhân đăng ký
+                                  </p>
+                                );
+                              }
+                              // Group by operation code+name
+                              const byOp: Record<
+                                string,
+                                { opId: string; regs: any[] }
+                              > = {};
+                              opRegs.forEach((reg: any) => {
+                                const opKey =
+                                  reg.operation?.code ||
+                                  reg.operation?.name ||
+                                  "Khác";
+                                const opName =
+                                  reg.operation?.name ||
+                                  reg.operationId?.name ||
+                                  "Khác";
+                                if (!byOp[opKey])
+                                  byOp[opKey] = { opId: "", regs: [] };
+                                byOp[opKey].regs.push(reg);
+                                // Try to capture the operationId for assign form
+                                if (
+                                  !byOp[opKey].opId &&
+                                  (reg.operationId || reg.operation?._id)
+                                ) {
+                                  byOp[opKey].opId =
+                                    typeof reg.operationId === "object"
+                                      ? reg.operationId?._id
+                                      : reg.operationId || "";
+                                }
+                              });
+
+                              return Object.entries(byOp).map(
+                                ([opKey, { opId: savedOpId, regs }]) => {
+                                  const opName =
+                                    regs[0]?.operation?.name ||
+                                    regs[0]?.operationId?.name ||
+                                    opKey;
+                                  const isSubExpanded =
+                                    expandedSubOp === `${r.processId}_${opKey}`;
+                                  // Tổng completed
+                                  const totalActual = regs
+                                    .filter(
+                                      (rg: any) => rg.status === "completed",
+                                    )
+                                    .reduce(
+                                      (s: number, rg: any) =>
+                                        s + (rg.actualQuantity || 0),
+                                      0,
+                                    );
+
+                                  return (
+                                    <div
+                                      key={opKey}
+                                      className="mb-2 border border-slate-200 rounded-md overflow-hidden"
+                                    >
+                                      {/* Operation header - clickable */}
+                                      <div className="flex items-center justify-between px-3 py-2.5 bg-white hover:bg-slate-50 transition-colors">
+                                        <button
+                                          className="flex items-center gap-2 flex-1 text-left"
+                                          onClick={() =>
+                                            setExpandedSubOp(
+                                              isSubExpanded
+                                                ? null
+                                                : `${r.processId}_${opKey}`,
+                                            )
+                                          }
+                                        >
+                                          {isSubExpanded ? (
+                                            <ChevronDown className="w-4 h-4 text-[#0077c0]" />
+                                          ) : (
+                                            <ChevronRight className="w-4 h-4 text-slate-400" />
+                                          )}
+                                          <span className="text-sm font-bold text-[#0077c0]">
+                                            {opName}
+                                          </span>
+                                          <span className="text-xs text-slate-400 ml-1">
+                                            {regs.length} lượt · {totalActual}/
+                                            {order?.quantity || 0} SP
+                                          </span>
+                                        </button>
+                                      </div>
+
+                                      {/* Expanded content */}
+                                      {isSubExpanded &&
+                                        (() => {
+                                          // Group by date
+                                          const byDate: Record<string, any[]> =
+                                            {};
+                                          regs.forEach((reg: any) => {
+                                            const dateKey = reg.date
+                                              ? dayjs(reg.date).format(
+                                                  "DD/MM/YYYY",
+                                                )
+                                              : "Không rõ";
+                                            if (!byDate[dateKey])
+                                              byDate[dateKey] = [];
+                                            byDate[dateKey].push(reg);
+                                          });
+
+                                          return (
+                                            <div className="border-t border-slate-200 bg-slate-50/50 px-3 py-2">
+                                              {Object.entries(byDate).map(
+                                                ([dateStr, dateRegs]) => (
+                                                  <div
+                                                    key={dateStr}
+                                                    className="mb-2.5 last:mb-0"
+                                                  >
+                                                    <div className="flex items-center justify-between mb-1">
+                                                      <span className="text-xs font-semibold text-slate-600">
+                                                        📅 {dateStr}
+                                                      </span>
+                                                      {(canEdit || isAdmin) &&
+                                                        order?.status !==
+                                                          "completed" && (
+                                                          <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-6 px-2.5 text-[11px] text-[#0077c0] border-[#0077c0]/30 hover:bg-blue-50"
+                                                            onClick={async (
+                                                              e,
+                                                            ) => {
+                                                              e.stopPropagation();
+                                                              if (
+                                                                users.length ===
+                                                                0
+                                                              )
+                                                                await loadUsersOps();
+                                                              const actualOpId =
+                                                                regs[0]
+                                                                  ?.operation
+                                                                  ?._id ||
+                                                                regs[0]
+                                                                  ?.operationId ||
+                                                                savedOpId ||
+                                                                "";
+                                                              const totalExp =
+                                                                order?.quantity ||
+                                                                0;
+                                                              const totalDone =
+                                                                regs.reduce(
+                                                                  (
+                                                                    s: number,
+                                                                    rg: any,
+                                                                  ) =>
+                                                                    s +
+                                                                    (rg.actualQuantity ||
+                                                                      0),
+                                                                  0,
+                                                                );
+                                                              const remaining =
+                                                                Math.max(
+                                                                  totalExp -
+                                                                    totalDone,
+                                                                  1,
+                                                                );
+                                                              setAssignForm({
+                                                                userId: "",
+                                                                operationId:
+                                                                  actualOpId.toString(),
+                                                                expectedQuantity:
+                                                                  remaining,
+                                                                replacementReason:
+                                                                  "",
+                                                              });
+                                                              setAssignOpen(
+                                                                true,
+                                                              );
+                                                            }}
+                                                          >
+                                                            + Bổ sung
+                                                          </Button>
+                                                        )}
+                                                    </div>
+                                                    <table className="w-full text-xs">
+                                                      <thead>
+                                                        <tr className="text-left text-slate-400">
+                                                          <th className="py-1.5 font-medium">
+                                                            Công nhân
+                                                          </th>
+                                                          <th className="py-1.5 font-medium text-center">
+                                                            Tiêu chuẩn
+                                                          </th>
+                                                          <th className="py-1.5 font-medium text-center">
+                                                            Thực tế
+                                                          </th>
+                                                          <th className="py-1.5 font-medium text-center">
+                                                            Chênh lệch
+                                                          </th>
+                                                          <th className="py-1.5 font-medium text-center">
+                                                            Phút
+                                                          </th>
+                                                          <th className="py-1.5 font-medium">
+                                                            Trạng thái
+                                                          </th>
+                                                          <th className="py-1.5 font-medium">
+                                                            Lý do
+                                                          </th>
+                                                        </tr>
+                                                      </thead>
+                                                      <tbody>
+                                                        {dateRegs.map(
+                                                          (reg: any) => {
+                                                            const actual =
+                                                              reg.actualQuantity ||
+                                                              0;
+                                                            const expected =
+                                                              reg.expectedQuantity ||
+                                                              0;
+                                                            const deviation =
+                                                              reg.deviation ??
+                                                              actual - expected;
+                                                            return (
+                                                              <tr
+                                                                key={reg._id}
+                                                                className="border-b border-slate-100"
+                                                              >
+                                                                <td className="py-1.5 font-medium text-slate-700">
+                                                                  {reg.worker
+                                                                    ?.name ||
+                                                                    reg.userId
+                                                                      ?.name}{" "}
+                                                                  <span className="text-slate-400">
+                                                                    (
+                                                                    {reg.worker
+                                                                      ?.code ||
+                                                                      reg.userId
+                                                                        ?.code}
+                                                                    )
+                                                                  </span>
+                                                                </td>
+                                                                <td className="py-1.5 text-center">
+                                                                  {expected}
+                                                                </td>
+                                                                <td className="py-1.5 text-center font-semibold">
+                                                                  {reg.status ===
+                                                                  "completed"
+                                                                    ? actual
+                                                                    : "—"}
+                                                                </td>
+                                                                <td
+                                                                  className={`py-1.5 text-center font-semibold ${
+                                                                    reg.status !==
+                                                                    "completed"
+                                                                      ? "text-slate-300"
+                                                                      : deviation >
+                                                                          0
+                                                                        ? "text-emerald-600"
+                                                                        : deviation <
+                                                                            0
+                                                                          ? "text-red-500"
+                                                                          : "text-slate-500"
+                                                                  }`}
+                                                                >
+                                                                  {reg.status ===
+                                                                  "completed"
+                                                                    ? deviation >
+                                                                      0
+                                                                      ? `+${deviation}`
+                                                                      : deviation
+                                                                    : "—"}
+                                                                </td>
+                                                                <td className="py-1.5 text-center text-slate-500">
+                                                                  {reg.workingMinutes ||
+                                                                    "—"}
+                                                                </td>
+                                                                <td className="py-1.5">
+                                                                  {(() => {
+                                                                    const isCompleted =
+                                                                      reg.status ===
+                                                                      "completed";
+                                                                    const needMore =
+                                                                      isCompleted &&
+                                                                      actual <
+                                                                        expected;
+                                                                    const isDone =
+                                                                      isCompleted &&
+                                                                      actual >=
+                                                                        expected;
+                                                                    return (
+                                                                      <Badge
+                                                                        variant="outline"
+                                                                        className={
+                                                                          isDone
+                                                                            ? "bg-emerald-100 text-emerald-700"
+                                                                            : needMore
+                                                                              ? "bg-orange-100 text-orange-700"
+                                                                              : reg.status ===
+                                                                                  "in_progress"
+                                                                                ? "bg-amber-100 text-amber-700"
+                                                                                : "bg-blue-100 text-blue-700"
+                                                                        }
+                                                                      >
+                                                                        {isDone
+                                                                          ? "Xong"
+                                                                          : needMore
+                                                                            ? "Cần bổ sung"
+                                                                            : reg.status ===
+                                                                                "in_progress"
+                                                                              ? "Đang làm"
+                                                                              : reg.status ===
+                                                                                  "registered"
+                                                                                ? "Đã ĐK"
+                                                                                : reg.status}
+                                                                      </Badge>
+                                                                    );
+                                                                  })()}
+                                                                </td>
+                                                                <td className="py-1.5 text-xs text-amber-600 max-w-[120px] truncate">
+                                                                  {reg.earlyLeaveReason ||
+                                                                    reg.replacementReason ||
+                                                                    "—"}
+                                                                </td>
+                                                              </tr>
+                                                            );
+                                                          },
+                                                        )}
+                                                      </tbody>
+                                                    </table>
+                                                  </div>
+                                                ),
+                                              )}
+                                            </div>
+                                          );
+                                        })()}
+                                    </div>
+                                  );
+                                },
+                              );
+                            })()}
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -685,9 +1044,30 @@ export default function ProductionOrderDetailPage() {
               <Label>Thao tác *</Label>
               <Select
                 value={assignForm.operationId}
-                onValueChange={(v) =>
-                  setAssignForm({ ...assignForm, operationId: v })
-                }
+                disabled={!!assignForm.operationId}
+                onValueChange={(v) => {
+                  // Tìm các registration đã hoàn thành của thao tác này
+                  const opsRegs = registrations.filter((r: any) => {
+                    const opId =
+                      typeof r.operationId === "object"
+                        ? r.operationId?._id?.toString()
+                        : r.operationId?.toString();
+                    return opId === v;
+                  });
+                  // SL kỳ vọng = số lượng lệnh SX (order.quantity)
+                  const totalExpected = order?.quantity || 0;
+                  // SL đã hoàn thành = tổng actualQuantity của các worker đã xong/đang làm
+                  const totalActual = opsRegs.reduce(
+                    (sum: number, r: any) => sum + (r.actualQuantity || 0),
+                    0,
+                  );
+                  const remaining = Math.max(totalExpected - totalActual, 1);
+                  setAssignForm({
+                    ...assignForm,
+                    operationId: v,
+                    expectedQuantity: remaining,
+                  });
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Chọn..." />
@@ -702,7 +1082,12 @@ export default function ProductionOrderDetailPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Số lượng *</Label>
+              <Label>
+                Số lượng *{" "}
+                <span className="text-xs text-slate-400 font-normal">
+                  (còn lại)
+                </span>
+              </Label>
               <Input
                 type="number"
                 min={1}
@@ -714,21 +1099,30 @@ export default function ProductionOrderDetailPage() {
                   })
                 }
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Lý do</Label>
-              <textarea
-                className="w-full border rounded-md p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#0077c0]/20"
-                rows={2}
-                value={assignForm.replacementReason}
-                onChange={(e) =>
-                  setAssignForm({
-                    ...assignForm,
-                    replacementReason: e.target.value,
-                  })
-                }
-                placeholder="VD: Nghỉ ốm..."
-              />
+              {assignForm.operationId &&
+                (() => {
+                  const opsRegs = registrations.filter((r: any) => {
+                    const opId =
+                      typeof r.operationId === "object"
+                        ? r.operationId?._id?.toString()
+                        : r.operationId?.toString();
+                    return opId === assignForm.operationId;
+                  });
+                  const totalExp = order?.quantity || 0;
+                  const totalAct = opsRegs.reduce(
+                    (s: number, r: any) => s + (r.actualQuantity || 0),
+                    0,
+                  );
+                  return (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Kỳ vọng: <strong>{totalExp}</strong> – Đã làm:{" "}
+                      <strong>{totalAct}</strong> = Còn lại:{" "}
+                      <strong className="text-[#0077c0]">
+                        {Math.max(totalExp - totalAct, 0)}
+                      </strong>
+                    </p>
+                  );
+                })()}
             </div>
           </div>
           <DialogFooter className="mt-4">

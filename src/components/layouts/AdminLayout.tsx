@@ -1,6 +1,7 @@
 import { useState, useEffect, ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import dayjs from "dayjs";
 import {
   LayoutDashboard,
   Car,
@@ -22,6 +23,8 @@ import {
   CreditCard,
   Building2,
   ShieldCheck,
+  AlertTriangle,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -34,7 +37,14 @@ import {
   DropdownMenuGroup,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import {
   Tooltip,
   TooltipContent,
@@ -121,6 +131,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -135,6 +146,18 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     refetchInterval: 30000,
   });
   const pendingCount = pendingData?.count || 0;
+
+  // Fetch shortage registrations count
+  const { data: shortageData } = useQuery({
+    queryKey: ["shortageCount"],
+    queryFn: async () => {
+      const res = await api.default.get("/registrations/admin/shortage-count");
+      return res.data;
+    },
+    refetchInterval: 30000,
+  });
+  const shortageCount = shortageData?.count || 0;
+  const totalNotif = pendingCount + shortageCount;
 
   useEffect(() => {
     const checkMobile = () => {
@@ -354,11 +377,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <CreditCard className="w-4 h-4 mr-2" />
               Tổng hợp lương
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => navigate("/admin/users?tab=pending")}
-            >
+            <DropdownMenuItem onClick={() => setNotifOpen(true)}>
               <Bell className="w-4 h-4 mr-2" />
               Thông báo
+              {totalNotif > 0 && (
+                <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {totalNotif}
+                </span>
+              )}
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
@@ -443,32 +469,182 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 )}
 
               {/* Notification Bell */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={pendingCount > 0 ? "default" : "ghost"}
-                    size="icon"
-                    className={`relative h-10 w-10 ${
-                      pendingCount > 0
-                        ? "bg-amber-500 hover:bg-amber-600 text-white animate-pulse"
-                        : ""
-                    }`}
-                    onClick={() => navigate("/admin/users?tab=pending")}
-                  >
-                    <Bell className="w-5 h-5" />
+              <Button
+                variant={totalNotif > 0 ? "default" : "ghost"}
+                size="icon"
+                className={`relative h-10 w-10 ${
+                  totalNotif > 0
+                    ? "bg-amber-500 hover:bg-amber-600 text-white animate-pulse"
+                    : ""
+                }`}
+                onClick={() => setNotifOpen(true)}
+              >
+                <Bell className="w-5 h-5" />
+                {totalNotif > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    {totalNotif}
+                  </span>
+                )}
+              </Button>
+
+              {/* Notification Offcanvas */}
+              <Sheet open={notifOpen} onOpenChange={setNotifOpen}>
+                <SheetContent
+                  side="right"
+                  className="w-[400px] sm:max-w-[420px] p-0 flex flex-col"
+                >
+                  <SheetHeader className="px-5 pt-5 pb-3 border-b border-slate-200">
+                    <SheetTitle className="flex items-center gap-2 text-lg">
+                      <Bell className="w-5 h-5 text-[#0077c0]" />
+                      Thông báo
+                      {totalNotif > 0 && (
+                        <Badge className="bg-red-500 text-white text-xs">
+                          {totalNotif}
+                        </Badge>
+                      )}
+                    </SheetTitle>
+                    <SheetDescription className="text-xs text-slate-500">
+                      Các thông báo cần xử lý
+                    </SheetDescription>
+                  </SheetHeader>
+
+                  <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+                    {/* Pending users section */}
                     {pendingCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                        {pendingCount}
-                      </span>
+                      <button
+                        className="w-full text-left p-3 rounded-lg bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors"
+                        onClick={() => {
+                          setNotifOpen(false);
+                          navigate("/admin/users?tab=pending");
+                        }}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <Users className="w-4 h-4 text-amber-600" />
+                          <span className="text-sm font-semibold text-amber-800">
+                            {pendingCount} tài khoản chờ duyệt
+                          </span>
+                          <ExternalLink className="w-3.5 h-3.5 text-amber-500 ml-auto" />
+                        </div>
+                        <p className="text-xs text-amber-600">
+                          Bấm để duyệt tài khoản
+                        </p>
+                      </button>
                     )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {pendingCount > 0
-                    ? `${pendingCount} tài khoản chờ duyệt`
-                    : "Không có thông báo"}
-                </TooltipContent>
-              </Tooltip>
+
+                    {/* Shortage items section */}
+                    {shortageCount > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 px-1">
+                          <AlertTriangle className="w-4 h-4 text-orange-500" />
+                          <span className="text-sm font-semibold text-slate-700">
+                            Cần bổ sung công nhân ({shortageCount})
+                          </span>
+                        </div>
+                        {(() => {
+                          // Group by orderId
+                          const items = shortageData?.items || [];
+                          const byOrder: Record<string, any[]> = {};
+                          items.forEach((item: any) => {
+                            const key = item.orderId;
+                            if (!byOrder[key]) byOrder[key] = [];
+                            byOrder[key].push(item);
+                          });
+                          return Object.entries(byOrder).map(
+                            ([orderId, orderItems]) => {
+                              const first = orderItems[0];
+                              return (
+                                <div
+                                  key={orderId}
+                                  className="rounded-lg border border-slate-200 bg-white overflow-hidden"
+                                >
+                                  {/* Order header - clickable */}
+                                  <button
+                                    className="w-full text-left px-3 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors flex items-center gap-2 border-b border-slate-100"
+                                    onClick={() => {
+                                      setNotifOpen(false);
+                                      navigate(`/admin/orders/${orderId}`);
+                                    }}
+                                  >
+                                    <FileText className="w-4 h-4 text-[#0077c0]" />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-sm font-semibold text-slate-800 truncate">
+                                        {first.orderName || first.orderCode}
+                                      </div>
+                                      {first.orderCode && first.orderName && (
+                                        <span className="text-[11px] text-slate-400">
+                                          {first.orderCode}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <Badge
+                                      variant="outline"
+                                      className="bg-orange-100 text-orange-700 text-[10px]"
+                                    >
+                                      {orderItems.length} thiếu
+                                    </Badge>
+                                    <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                                  </button>
+                                  {/* Shortage details */}
+                                  <div className="divide-y divide-slate-100">
+                                    {orderItems.map((item: any) => (
+                                      <div
+                                        key={item._id}
+                                        className="px-3 py-2 hover:bg-orange-50/50 cursor-pointer transition-colors"
+                                        onClick={() => {
+                                          setNotifOpen(false);
+                                          navigate(`/admin/orders/${orderId}`);
+                                        }}
+                                      >
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex-1 min-w-0">
+                                            <div className="text-xs font-medium text-slate-700">
+                                              {item.processName} →{" "}
+                                              {item.operationName}
+                                            </div>
+                                            <div className="text-[11px] text-slate-500 mt-0.5">
+                                              {item.workerName} (
+                                              {item.workerCode})
+                                              {item.date && (
+                                                <span className="ml-1.5 text-slate-400">
+                                                  ·{" "}
+                                                  {dayjs(item.date).format(
+                                                    "DD/MM",
+                                                  )}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <div className="text-right ml-2">
+                                            <span className="text-xs font-bold text-orange-600">
+                                              -{item.shortage}
+                                            </span>
+                                            <div className="text-[10px] text-slate-400">
+                                              {item.actualQuantity}/
+                                              {item.expectedQuantity}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            },
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    {/* Empty state */}
+                    {totalNotif === 0 && (
+                      <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                        <Bell className="w-10 h-10 mb-3 text-slate-300" />
+                        <span className="text-sm">Không có thông báo nào</span>
+                      </div>
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
 
               {/* User Dropdown */}
               <DropdownMenu>
@@ -521,11 +697,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       <CreditCard className="w-4 h-4 mr-2" />
                       Tổng hợp lương
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => navigate("/admin/users?tab=pending")}
-                    >
+                    <DropdownMenuItem onClick={() => setNotifOpen(true)}>
                       <Bell className="w-4 h-4 mr-2" />
                       Thông báo
+                      {totalNotif > 0 && (
+                        <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                          {totalNotif}
+                        </span>
+                      )}
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />

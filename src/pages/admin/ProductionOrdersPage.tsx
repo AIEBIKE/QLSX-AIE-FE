@@ -313,6 +313,9 @@ export default function ProductionOrdersPage() {
                             <div className="text-sm font-medium text-slate-600 mt-0.5">
                               {order.vehicleTypeId?.name}
                             </div>
+                            <div className="text-xs text-slate-400 mt-0.5">
+                              🏭 {order.factoryId?.name || "—"}
+                            </div>
                           </div>
                           <Badge
                             variant="outline"
@@ -356,6 +359,9 @@ export default function ProductionOrdersPage() {
                     <TableHead className="font-bold text-slate-700">
                       Loại xe
                     </TableHead>
+                    <TableHead className="font-bold text-slate-700">
+                      Nhà máy
+                    </TableHead>
                     <TableHead className="font-bold text-slate-700 text-center">
                       Số lượng
                     </TableHead>
@@ -374,7 +380,7 @@ export default function ProductionOrdersPage() {
                   {orders.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={6}
+                        colSpan={7}
                         className="text-center py-16 text-slate-400"
                       >
                         <div className="flex flex-col items-center">
@@ -404,6 +410,11 @@ export default function ProductionOrdersPage() {
                             <div className="text-xs text-slate-400 font-mono">
                               {order.vehicleTypeId?.code}
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-slate-600">
+                              {order.factoryId?.name || "—"}
+                            </span>
                           </TableCell>
                           <TableCell className="text-center">
                             <Badge
