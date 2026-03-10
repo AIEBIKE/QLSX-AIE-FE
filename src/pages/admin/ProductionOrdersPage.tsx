@@ -81,14 +81,14 @@ export default function ProductionOrdersPage() {
   const isAdmin = roleCode === "ADMIN";
   const isFacManager = roleCode === "FAC_MANAGER";
   const isSupervisor = roleCode === "SUPERVISOR";
-  const canManage = isAdmin || isFacManager || isSupervisor;
+  const canEdit = isFacManager; // Only Factory Manager can CRUD orders
+  const canView = isAdmin || isFacManager || isSupervisor;
 
   const [orders, setOrders] = useState<any[]>([]);
   const [vehicleTypes, setVehicleTypes] = useState<any[]>([]);
   const [factories, setFactories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [detailModal, setDetailModal] = useState<any>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [selectedFactory, setSelectedFactory] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -253,17 +253,16 @@ export default function ProductionOrdersPage() {
             </div>
           )}
         </div>
-        {canManage && (
+        {canEdit && (
           <Button
             onClick={() => {
               resetForm();
               setModalOpen(true);
             }}
-            className="bg-[#0077c0] hover:bg-[#005fa3] transition-all active:scale-95"
+            className="bg-primary hover:bg-primary/90 text-white"
           >
-            <Plus className="w-4 h-4 mr-1" />
-            <span className="hidden sm:inline">Tạo lệnh mới</span>
-            <span className="sm:hidden">Tạo mới</span>
+            <Plus className="mr-2 h-4 w-4" />
+            Tạo lệnh mới
           </Button>
         )}
       </div>
@@ -290,7 +289,9 @@ export default function ProductionOrdersPage() {
                     <Card
                       key={order._id}
                       className="border-slate-200 hover:shadow-md transition-shadow cursor-pointer overflow-hidden group"
-                      onClick={() => setDetailModal(order)}
+                      onClick={() =>
+                        navigate(`/admin/production-orders/${order._id}`)
+                      }
                     >
                       <CardContent className="pt-4">
                         <div className="flex justify-between items-start mb-2">
@@ -420,7 +421,11 @@ export default function ProductionOrdersPage() {
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8 text-[#0077c0] hover:bg-blue-50"
-                                    onClick={() => setDetailModal(order)}
+                                    onClick={() =>
+                                      navigate(
+                                        `/admin/production-orders/${order._id}`,
+                                      )
+                                    }
                                   >
                                     <Eye className="w-4 h-4" />
                                   </Button>
@@ -428,7 +433,7 @@ export default function ProductionOrdersPage() {
                                 <TooltipContent>Xem chi tiết</TooltipContent>
                               </Tooltip>
 
-                              {isAdmin && order.status === "pending" && (
+                              {canEdit && order.status === "pending" && (
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                     <Button
@@ -489,86 +494,6 @@ export default function ProductionOrdersPage() {
           />
         </>
       )}
-
-      {/* Detail Modal */}
-      <Dialog
-        open={!!detailModal}
-        onOpenChange={(open) => !open && setDetailModal(null)}
-      >
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Chi tiết lệnh: {detailModal?.orderCode}</DialogTitle>
-          </DialogHeader>
-          {detailModal && (
-            <div className="space-y-4 py-2">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="p-3 bg-slate-50 rounded-lg">
-                  <div className="text-slate-500 mb-1">Loại xe</div>
-                  <div className="font-bold text-slate-800">
-                    {detailModal.vehicleTypeId?.name}
-                  </div>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-lg">
-                  <div className="text-slate-500 mb-1">Số lượng</div>
-                  <div className="font-bold text-slate-800">
-                    {detailModal.quantity} xe
-                  </div>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-lg">
-                  <div className="text-slate-500 mb-1">Ngày bắt đầu</div>
-                  <div className="font-bold text-slate-800">
-                    {dayjs(detailModal.startDate).format("DD/MM/YYYY")}
-                  </div>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-lg">
-                  <div className="text-slate-500 mb-1">Dự kiến kết thúc</div>
-                  <div className="font-bold text-slate-800">
-                    {detailModal.expectedEndDate
-                      ? dayjs(detailModal.expectedEndDate).format("DD/MM/YYYY")
-                      : "-"}
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-slate-500">
-                  Danh sách số khung ({detailModal.frameNumbers?.length || 0})
-                </Label>
-                <div className="max-h-[100px] overflow-y-auto font-mono text-xs bg-slate-50 p-3 rounded-lg border border-slate-100 leading-relaxed italic">
-                  {detailModal.frameNumbers?.join(", ") || "Chưa cập nhật"}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-slate-500">
-                  Danh sách số máy ({detailModal.engineNumbers?.length || 0})
-                </Label>
-                <div className="max-h-[100px] overflow-y-auto font-mono text-xs bg-slate-50 p-3 rounded-lg border border-slate-100 leading-relaxed italic">
-                  {detailModal.engineNumbers?.join(", ") || "Chưa cập nhật"}
-                </div>
-              </div>
-
-              {detailModal.note && (
-                <div className="space-y-1">
-                  <Label className="text-slate-500">Ghi chú</Label>
-                  <p className="text-sm p-3 bg-slate-50 rounded-lg border border-slate-100">
-                    {detailModal.note}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-          <DialogFooter>
-            <Button
-              variant="secondary"
-              onClick={() => setDetailModal(null)}
-              className="w-full sm:w-auto"
-            >
-              Đóng
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Create Modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import dayjs from "dayjs";
+import Cookies from "js-cookie";
 import {
   CheckCircle,
   UserPlus,
@@ -95,6 +96,13 @@ const statusMap: Record<string, { cls: string; label: string }> = {
 export default function ProductionOrderDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const user = JSON.parse(Cookies.get("user") || "{}");
+  const roleCode = (user.roleCode || user.role || "").toUpperCase();
+  const isAdmin = roleCode === "ADMIN";
+  const isFacManager = roleCode === "FAC_MANAGER";
+  const isSupervisor = roleCode === "SUPERVISOR";
+  const canEdit = isFacManager; // Only Fac Manager can CRUD Production Orders
+
   const [loading, setLoading] = useState(true);
   const [order, setOrder] = useState<any>(null);
   const [progress, setProgress] = useState<any[]>([]);
@@ -339,12 +347,46 @@ export default function ProductionOrderDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Additional Details Card */}
+      <Card className="mb-6 border-slate-200">
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label className="text-slate-500 font-medium mb-1.5 block">
+                Danh sách số khung ({order?.frameNumbers?.length || 0})
+              </Label>
+              <div className="max-h-[120px] overflow-y-auto font-mono text-xs bg-slate-50 p-3 rounded-lg border border-slate-100 leading-relaxed italic text-slate-600">
+                {order?.frameNumbers?.join(", ") || "Chưa cập nhật"}
+              </div>
+            </div>
+            <div>
+              <Label className="text-slate-500 font-medium mb-1.5 block">
+                Danh sách số máy ({order?.engineNumbers?.length || 0})
+              </Label>
+              <div className="max-h-[120px] overflow-y-auto font-mono text-xs bg-slate-50 p-3 rounded-lg border border-slate-100 leading-relaxed italic text-slate-600">
+                {order?.engineNumbers?.join(", ") || "Chưa cập nhật"}
+              </div>
+            </div>
+          </div>
+          {order?.note && (
+            <div className="mt-4 pt-4 border-t border-slate-100">
+              <Label className="text-slate-500 font-medium mb-1.5 block">
+                Ghi chú
+              </Label>
+              <div className="text-sm p-3 bg-slate-50 rounded-lg border border-slate-100 text-slate-700">
+                {order.note}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Process Table */}
       <Card className="border-slate-200">
         <CardContent className="pt-6">
           <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
             <h3 className="text-lg font-bold">Tiến độ công đoạn</h3>
-            {order?.status === "in_progress" && (
+            {canEdit && order?.status === "in_progress" && (
               <Button
                 onClick={() => {
                   loadUsersOps();
@@ -466,33 +508,39 @@ export default function ProductionOrderDetailPage() {
               <Button variant="outline" onClick={loadData}>
                 <RefreshCw className="w-4 h-4 mr-1" /> Làm mới
               </Button>
-              <Button variant="outline" onClick={handleCheckCompletion}>
-                <AlertTriangle className="w-4 h-4 mr-1" /> Kiểm tra
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button className="bg-emerald-500 hover:bg-emerald-600">
-                    <CheckCircle className="w-4 h-4 mr-1" /> Hoàn thành
+              {canEdit && (
+                <>
+                  <Button variant="outline" onClick={handleCheckCompletion}>
+                    <AlertTriangle className="w-4 h-4 mr-1" /> Kiểm tra
                   </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Xác nhận hoàn thành?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Lệnh sẽ được đánh dấu hoàn thành.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Hủy</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleComplete}
-                      className="bg-emerald-500"
-                    >
-                      Hoàn thành
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button className="bg-emerald-500 hover:bg-emerald-600">
+                        <CheckCircle className="w-4 h-4 mr-1" /> Hoàn thành
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          Xác nhận hoàn thành?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Lệnh sẽ được đánh dấu hoàn thành.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Hủy</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleComplete}
+                          className="bg-emerald-500"
+                        >
+                          Hoàn thành
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </>
+              )}
             </div>
           )}
         </CardContent>
