@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   Download,
   Loader2,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,61 +40,8 @@ export default function SalaryPage() {
       setDailyBreakdown(data?.dailyDetails || []);
     } catch (err) {
       console.error(err);
-      setSalaryData({
-        workingDays: 22,
-        totalOutput: 2150,
-        totalBonus: 1200000,
-        totalPenalty: 50000,
-        netIncome: 14150000,
-        previousMonthIncome: 12500000,
-      });
-      setDailyBreakdown([
-        {
-          date: "2026-03-22",
-          operation: "Lắp khung chính",
-          standardOutput: 100,
-          actualOutput: 115,
-          difference: 15,
-          bonus: 75000,
-          penalty: 0,
-        },
-        {
-          date: "2026-03-21",
-          operation: "Lắp khung chính",
-          standardOutput: 100,
-          actualOutput: 108,
-          difference: 8,
-          bonus: 40000,
-          penalty: 0,
-        },
-        {
-          date: "2026-03-20",
-          operation: "Lắp động cơ",
-          standardOutput: 80,
-          actualOutput: 75,
-          difference: -5,
-          bonus: 0,
-          penalty: 12500,
-        },
-        {
-          date: "2026-03-19",
-          operation: "Lắp khung chính",
-          standardOutput: 100,
-          actualOutput: 102,
-          difference: 2,
-          bonus: 10000,
-          penalty: 0,
-        },
-        {
-          date: "2026-03-18",
-          operation: "Lắp khung chính",
-          standardOutput: 100,
-          actualOutput: 100,
-          difference: 0,
-          bonus: 0,
-          penalty: 0,
-        },
-      ]);
+      setSalaryData(null);
+      setDailyBreakdown([]);
     } finally {
       setLoading(false);
     }
@@ -117,6 +65,18 @@ export default function SalaryPage() {
         <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
       </div>
     );
+
+  // Tổng thời gian làm việc (phút)
+  const totalWorkingMinutes = dailyBreakdown.reduce(
+    (sum: number, r: any) => sum + (r.workingMinutes || 0),
+    0,
+  );
+  const shiftMinutesPerDay = 480; // 8 tiếng/ca
+  const totalShiftMinutes = (salaryData?.workingDays || 0) * shiftMinutesPerDay;
+  const efficiencyPercent =
+    totalShiftMinutes > 0
+      ? Math.round((totalWorkingMinutes / totalShiftMinutes) * 100)
+      : 0;
 
   const statCards = [
     {
@@ -227,6 +187,45 @@ export default function SalaryPage() {
         ))}
       </div>
 
+      {/* Working Minutes vs 480-min Comparison */}
+      {totalWorkingMinutes > 0 && (
+        <Card className="mb-6 border-slate-200">
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-violet-100 text-violet-600">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-sm font-medium">
+                  Thời gian làm việc thực tế
+                </div>
+                <div className="text-xs text-slate-500">
+                  {Math.floor(totalWorkingMinutes / 60)}h{" "}
+                  {totalWorkingMinutes % 60}p /{" "}
+                  {Math.floor(totalShiftMinutes / 60)}h tiêu chuẩn (
+                  {shiftMinutesPerDay} phút × {salaryData?.workingDays || 0}{" "}
+                  ngày)
+                </div>
+              </div>
+              <div className="ml-auto text-right">
+                <span
+                  className={`text-2xl font-bold ${efficiencyPercent >= 100 ? "text-emerald-600" : efficiencyPercent >= 80 ? "text-blue-600" : "text-amber-600"}`}
+                >
+                  {efficiencyPercent}%
+                </span>
+                <div className="text-xs text-slate-500">Hiệu suất</div>
+              </div>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-2.5">
+              <div
+                className={`h-2.5 rounded-full transition-all ${efficiencyPercent >= 100 ? "bg-emerald-500" : efficiencyPercent >= 80 ? "bg-blue-500" : "bg-amber-500"}`}
+                style={{ width: `${Math.min(efficiencyPercent, 100)}%` }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Daily Breakdown */}
       <Card className="border-slate-200">
         <CardHeader className="flex-row items-center justify-between pb-3">
@@ -265,6 +264,9 @@ export default function SalaryPage() {
                     </th>
                     <th className="px-4 py-3 font-medium text-red-500 text-right">
                       PHẠT
+                    </th>
+                    <th className="px-4 py-3 font-medium text-violet-600 text-center">
+                      PHÚT
                     </th>
                   </tr>
                 </thead>
@@ -322,6 +324,11 @@ export default function SalaryPage() {
                         ) : (
                           <span className="text-slate-300">-</span>
                         )}
+                      </td>
+                      <td className="px-4 py-2.5 text-center">
+                        <span className="text-sm text-violet-600 font-medium">
+                          {row.workingMinutes ? `${row.workingMinutes}p` : "-"}
+                        </span>
                       </td>
                     </tr>
                   ))}

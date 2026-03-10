@@ -41,7 +41,12 @@ export default function QCInspectionPage() {
   >({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const user = JSON.parse(Cookies.get("user") || "{}");
+  const [framePrefix, setFramePrefix] = useState("");
+  const [enginePrefix, setEnginePrefix] = useState("");
+  const [autoIndex, setAutoIndex] = useState(1);
+  const user = JSON.parse(
+    localStorage.getItem("user") || Cookies.get("user") || "{}",
+  );
   const roleCode = user.roleCode || user.role;
   const isSupervisor = roleCode === "SUPERVISOR";
 
@@ -114,8 +119,22 @@ export default function QCInspectionPage() {
 
       await api.inspectVehicle(payload);
       toast.success("Đã lưu kết quả kiểm tra!");
-      setFrameNumber("");
-      setEngineNumber("");
+      // Auto-increment for next vehicle
+      setAutoIndex((prev) => prev + 1);
+      if (framePrefix) {
+        setFrameNumber(
+          `${framePrefix}-${String(autoIndex + 1).padStart(3, "0")}`,
+        );
+      } else {
+        setFrameNumber("");
+      }
+      if (enginePrefix) {
+        setEngineNumber(
+          `${enginePrefix}-${String(autoIndex + 1).padStart(3, "0")}`,
+        );
+      } else {
+        setEngineNumber("");
+      }
       setColor("");
     } catch (err: any) {
       toast.error(err.response?.data?.error?.message || "Lỗi khi lưu kết quả");
@@ -173,23 +192,57 @@ export default function QCInspectionPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="frame">Số khung (Frame Number) *</Label>
-                  <Input
-                    id="frame"
-                    placeholder="VD: FRAME-12345"
-                    value={frameNumber}
-                    disabled={!isSupervisor}
-                    onChange={(e) => setFrameNumber(e.target.value)}
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Prefix (VD: XDD)"
+                      value={framePrefix}
+                      onChange={(e) => {
+                        setFramePrefix(e.target.value);
+                        if (e.target.value) {
+                          setFrameNumber(
+                            `${e.target.value}-${String(autoIndex).padStart(3, "0")}`,
+                          );
+                        }
+                      }}
+                      disabled={!isSupervisor}
+                      className="w-24"
+                    />
+                    <Input
+                      id="frame"
+                      placeholder="VD: FRAME-12345"
+                      value={frameNumber}
+                      disabled={!isSupervisor}
+                      onChange={(e) => setFrameNumber(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="engine">Số máy (Engine Number)</Label>
-                  <Input
-                    id="engine"
-                    placeholder="VD: ENG-67890"
-                    value={engineNumber}
-                    disabled={!isSupervisor}
-                    onChange={(e) => setEngineNumber(e.target.value)}
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Prefix (VD: MS)"
+                      value={enginePrefix}
+                      onChange={(e) => {
+                        setEnginePrefix(e.target.value);
+                        if (e.target.value) {
+                          setEngineNumber(
+                            `${e.target.value}-${String(autoIndex).padStart(3, "0")}`,
+                          );
+                        }
+                      }}
+                      disabled={!isSupervisor}
+                      className="w-24"
+                    />
+                    <Input
+                      id="engine"
+                      placeholder="VD: ENG-67890"
+                      value={engineNumber}
+                      disabled={!isSupervisor}
+                      onChange={(e) => setEngineNumber(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="color">Màu sắc (Color)</Label>
