@@ -177,6 +177,7 @@ export interface PaginatedResponse<T> {
     total: number;
     totalPages: number;
   };
+  meta?: any;
 }
 
 export interface LoginResponse {

@@ -96,7 +96,7 @@ const menuItems: MenuItem[] = [
   {
     key: "/admin/salary-summary",
     icon: <Wallet className="w-4 h-4" />,
-    label: "💰 Tổng hợp lương",
+    label: "Tổng hợp lương",
   },
   {
     key: "/admin/users",

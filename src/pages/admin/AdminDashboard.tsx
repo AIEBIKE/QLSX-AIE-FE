@@ -45,9 +45,12 @@ export default function AdminDashboard() {
       ).length;
 
       setStats({
-        vehicleTypes: (vehicleTypesRes.data as any).count || 0,
+        vehicleTypes: (vehicleTypesRes.data as any).pagination?.total || 0,
         activeOrder: activeOrderRes.data.data,
-        todayRegistrations: (registrationsRes.data as any).count || 0,
+        todayRegistrations:
+          (registrationsRes.data as any).count ||
+          (registrationsRes.data as any).pagination?.total ||
+          0,
         completedRegistrations: completed,
       });
     } catch (error) {

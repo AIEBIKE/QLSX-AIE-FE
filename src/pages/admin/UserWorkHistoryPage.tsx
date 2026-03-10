@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import * as api from "../../services/api";
+import { Pagination } from "@/components/shared/Pagination";
 
 const statusColors: Record<string, string> = {
   registered: "bg-blue-100 text-blue-700",
@@ -28,6 +29,12 @@ export default function UserWorkHistoryPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1,
+  });
 
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768);
@@ -41,8 +48,21 @@ export default function UserWorkHistoryPage() {
       const params: any = {};
       if (startDate) params.startDate = new Date(startDate).toISOString();
       if (endDate) params.endDate = new Date(endDate).toISOString();
+      params.page = pagination.page;
+      params.limit = pagination.limit;
       const res = await api.getUserWorkHistory(id as string, params);
-      setData(res.data.data);
+      setData({
+        user: res.data.meta?.user,
+        registrations: res.data.data,
+        statistics: res.data.meta?.statistics,
+      });
+      if (res.data.pagination) {
+        setPagination((prev) => ({
+          ...prev,
+          total: res.data.pagination.total,
+          totalPages: res.data.pagination.totalPages,
+        }));
+      }
     } catch (error) {
       console.error("Lỗi tải lịch sử:", error);
     } finally {
@@ -52,7 +72,7 @@ export default function UserWorkHistoryPage() {
 
   useEffect(() => {
     loadHistory();
-  }, [loadHistory]);
+  }, [loadHistory, pagination.page, pagination.limit]);
 
   const formatMinutes = (minutes: number) => {
     if (!minutes) return "0 phút";
@@ -329,6 +349,23 @@ export default function UserWorkHistoryPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="px-6 py-4 flex items-center justify-between border-t border-slate-200">
+            <div className="text-sm text-slate-500">
+              Hiển thị {registrations?.length || 0} / {pagination.total} bản ghi
+            </div>
+            <Pagination
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              limit={pagination.limit}
+              total={pagination.total}
+              onPageChange={(p) =>
+                setPagination((prev) => ({ ...prev, page: p }))
+              }
+              onLimitChange={(l) =>
+                setPagination((prev) => ({ ...prev, limit: l, page: 1 }))
+              }
+            />
           </div>
         </Card>
       )}

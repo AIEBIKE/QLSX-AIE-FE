@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { Pagination } from "@/components/shared/Pagination";
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,11 +42,20 @@ export default function VehicleTypesPage() {
   const isAdmin = roleCode === "ADMIN" || roleCode === "admin";
 
   const [vehicleTypes, setVehicleTypes] = useState<any[]>([]);
-
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1,
+  });
+
   const [formData, setFormData] = useState({
     name: "",
     code: "",
@@ -59,17 +69,35 @@ export default function VehicleTypesPage() {
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+  }, [pagination.page, pagination.limit]);
 
   const loadVehicleTypes = async () => {
+    setLoading(true);
     try {
-      const res = await api.getVehicleTypes();
+      const res = await api.getVehicleTypes({
+        page: pagination.page,
+        limit: pagination.limit,
+        search: searchTerm || undefined,
+      });
       setVehicleTypes(res.data.data || []);
+      if (res.data.pagination) {
+        setPagination((prev) => ({
+          ...prev,
+          total: res.data.pagination.total,
+          totalPages: res.data.pagination.totalPages,
+        }));
+      }
     } catch {
       toast.error("Lỗi tải dữ liệu");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    loadVehicleTypes();
   };
 
   const handleSubmit = async () => {
@@ -120,18 +148,23 @@ export default function VehicleTypesPage() {
     setModalOpen(true);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[300px]">
-        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-      </div>
-    );
-  }
-
   return (
     <div>
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-        <h2 className="text-xl font-bold text-slate-800">🚗 Loại Xe</h2>
+        <div className="flex items-center gap-4 flex-1 min-w-[300px]">
+          <h2 className="text-xl font-bold text-slate-800">🚗 Loại Xe</h2>
+          <form onSubmit={handleSearch} className="flex gap-2 flex-1 max-w-sm">
+            <Input
+              placeholder="Tìm theo tên hoặc mã..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-9"
+            />
+            <Button type="submit" variant="secondary" className="h-9">
+              Tìm
+            </Button>
+          </form>
+        </div>
         {isAdmin && (
           <Button
             onClick={handleAdd}
@@ -142,164 +175,190 @@ export default function VehicleTypesPage() {
         )}
       </div>
 
-      {isMobile ? (
-        <div className="space-y-3">
-          {vehicleTypes.map((vt) => (
-            <Card key={vt._id} className="border-slate-200">
-              <CardContent className="pt-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="font-bold text-base font-mono">
-                      {vt.code}
-                    </span>
-                    <div className="text-sm">{vt.name}</div>
-                    {vt.framePrefix && (
-                      <span className="text-xs text-slate-500">
-                        Khung: {vt.framePrefix}
-                      </span>
-                    )}
-                  </div>
-                  <Badge
-                    variant={vt.active ? "default" : "secondary"}
-                    className={
-                      vt.active
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-red-100 text-red-700"
-                    }
-                  >
-                    {vt.active ? "On" : "Off"}
-                  </Badge>
-                </div>
-                {isAdmin && (
-                  <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleEdit(vt)}
-                    >
-                      <Pencil className="w-3.5 h-3.5 mr-1" /> Sửa
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-red-500"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 mr-1" /> Xóa
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Xóa loại xe này?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Hành động này không thể hoàn tác
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Hủy</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDelete(vt._id)}
-                            className="bg-red-500 hover:bg-red-600"
-                          >
-                            Xóa
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+      {loading ? (
+        <div className="flex items-center justify-center h-[300px]">
+          <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
         </div>
       ) : (
-        <Card className="border-slate-200">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Mã</TableHead>
-                <TableHead>Tên loại xe</TableHead>
-                <TableHead>Prefix Khung</TableHead>
-                <TableHead className="w-[100px]">Trạng thái</TableHead>
-                {isAdmin && (
-                  <TableHead className="w-[120px] text-right">
-                    Thao tác
-                  </TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        <>
+          {isMobile ? (
+            <div className="space-y-3">
               {vehicleTypes.map((vt) => (
-                <TableRow key={vt._id}>
-                  <TableCell className="font-bold font-mono">
-                    {vt.code}
-                  </TableCell>
-                  <TableCell>{vt.name}</TableCell>
-                  <TableCell className="text-slate-500">
-                    {vt.framePrefix || "-"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={
-                        vt.active
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                          : "bg-red-50 text-red-600 border-red-200"
-                      }
-                    >
-                      {vt.active ? "Hoạt động" : "Tắt"}
-                    </Badge>
-                  </TableCell>
-                  {isAdmin && (
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          onClick={() => handleEdit(vt)}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8 text-red-500"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>
-                                Xóa loại xe này?
-                              </AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Hành động này không thể hoàn tác
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Hủy</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleDelete(vt._id)}
-                                className="bg-red-500 hover:bg-red-600"
-                              >
-                                Xóa
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                <Card key={vt._id} className="border-slate-200">
+                  <CardContent className="pt-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-800">
+                            {vt.name}
+                          </span>
+                          <Badge variant="outline" className="text-xs">
+                            {vt.code}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-slate-500 mt-1">
+                          Khung: {vt.framePrefix} | Máy: {vt.enginePrefix}
+                        </p>
                       </div>
-                    </TableCell>
-                  )}
-                </TableRow>
+                      {isAdmin && (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-blue-600"
+                            onClick={() => handleEdit(vt)}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Xác nhận xóa?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Hành động này không thể hoàn tác.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Hủy</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDelete(vt._id)}
+                                  className="bg-red-600"
+                                >
+                                  Xóa
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
-            </TableBody>
-          </Table>
-        </Card>
+            </div>
+          ) : (
+            <Card className="border-slate-200 shadow-sm overflow-hidden">
+              <Table>
+                <TableHeader className="bg-slate-50">
+                  <TableRow>
+                    <TableHead className="font-bold">Mã loại xe</TableHead>
+                    <TableHead className="font-bold">Tên loại xe</TableHead>
+                    <TableHead className="font-bold">Tiền tố khung</TableHead>
+                    <TableHead className="font-bold">Tiền tố máy</TableHead>
+                    {isAdmin && (
+                      <TableHead className="text-right font-bold w-[100px]">
+                        Thao tác
+                      </TableHead>
+                    )}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {vehicleTypes.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={isAdmin ? 5 : 4}
+                        className="text-center py-10 text-slate-500"
+                      >
+                        Chưa có dữ liệu loại xe
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    vehicleTypes.map((vt) => (
+                      <TableRow key={vt._id} className="hover:bg-slate-50">
+                        <TableCell>
+                          <Badge variant="secondary" className="font-mono">
+                            {vt.code}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-medium text-slate-700">
+                          {vt.name}
+                        </TableCell>
+                        <TableCell className="text-slate-600">
+                          {vt.framePrefix || "-"}
+                        </TableCell>
+                        <TableCell className="text-slate-600">
+                          {vt.enginePrefix || "-"}
+                        </TableCell>
+                        {isAdmin && (
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                onClick={() => handleEdit(vt)}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      Xác nhận xóa loại xe?
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Bạn đang xóa loại xe{" "}
+                                      <span className="font-bold">
+                                        {vt.name}
+                                      </span>
+                                      . Hành động này không thể hoàn tác.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Hủy</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDelete(vt._id)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                    >
+                                      Xác nhận xóa
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          )}
+
+          <Pagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            limit={pagination.limit}
+            total={pagination.total}
+            onPageChange={(p: number) =>
+              setPagination((prev) => ({ ...prev, page: p }))
+            }
+            onLimitChange={(l: number) =>
+              setPagination((prev) => ({ ...prev, limit: l, page: 1 }))
+            }
+          />
+        </>
       )}
 
       {/* Create/Edit Modal */}

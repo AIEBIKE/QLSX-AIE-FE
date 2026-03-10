@@ -1,6 +1,7 @@
 import axios, { AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import type {
   ApiResponse,
+  PaginatedResponse,
   User,
   VehicleType,
   Process,
@@ -67,7 +68,7 @@ export const changePassword = (data: {
 // Vehicle Types
 export const getVehicleTypes = (
   params?: Record<string, unknown>,
-): Promise<AxiosResponse<ApiResponse<VehicleType[]>>> =>
+): Promise<AxiosResponse<PaginatedResponse<VehicleType>>> =>
   api.get("/vehicle-types", { params });
 export const getVehicleType = (
   id: string,
@@ -90,7 +91,7 @@ export const deleteVehicleType = (
 // Production Orders
 export const getProductionOrders = (
   params?: Record<string, unknown>,
-): Promise<AxiosResponse<ApiResponse<ProductionOrder[]>>> =>
+): Promise<AxiosResponse<PaginatedResponse<ProductionOrder>>> =>
   api.get("/production-orders", { params });
 export const getActiveProductionOrder = (): Promise<
   AxiosResponse<ApiResponse<ProductionOrder | null>>
@@ -121,7 +122,7 @@ export const deleteProductionOrder = (
 // Production Standards
 export const getProductionStandards = (
   params?: Record<string, unknown>,
-): Promise<AxiosResponse<ApiResponse<ProductionStandard[]>>> =>
+): Promise<AxiosResponse<PaginatedResponse<ProductionStandard>>> =>
   api.get("/production-standards", { params });
 export const getProductionStandard = (
   id: string,
@@ -245,7 +246,7 @@ export const assignWorkerToOrder = (
   api.post(`/production-orders/${id}/assign-worker`, data);
 
 // Users Management
-export const getUsers = (params?: Record<string, unknown>): Promise<AxiosResponse<ApiResponse<User[]>>> =>
+export const getUsers = (params?: Record<string, unknown>): Promise<AxiosResponse<PaginatedResponse<User>>> =>
   api.get("/auth/users", { params });
 
 export const getUser = (
@@ -265,8 +266,12 @@ export const deleteUser = (
 export const getUserWorkHistory = (
   id: string,
   params?: Record<string, unknown>,
-): Promise<AxiosResponse<ApiResponse<unknown>>> =>
+): Promise<AxiosResponse<PaginatedResponse<any>>> =>
   api.get(`/auth/users/${id}/work-history`, { params });
+export const getAdminSalarySummary = (
+  params?: Record<string, unknown>,
+): Promise<AxiosResponse<PaginatedResponse<any>>> =>
+  api.get("/auth/users/salary-summary", { params });
 
 // Shifts
 export const startShift = (): Promise<AxiosResponse<ApiResponse<Shift>>> =>

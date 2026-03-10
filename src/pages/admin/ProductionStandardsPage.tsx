@@ -49,6 +49,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import * as api from "../../services/api";
+import { Pagination } from "@/components/shared/Pagination";
 
 export default function ProductionStandardsPage() {
   const [vehicleTypes, setVehicleTypes] = useState<any[]>([]);
@@ -67,6 +68,7 @@ export default function ProductionStandardsPage() {
   const isAdmin = roleCode === "ADMIN" || roleCode === "admin";
   const isFacManager = roleCode === "FAC_MANAGER" || roleCode === "fac_manager";
   const isSupervisor = roleCode === "SUPERVISOR" || roleCode === "supervisor";
+  const canEdit = isFacManager && !isAdmin;
 
   const [factories, setFactories] = useState<any[]>([]);
   const [selectedFactory, setSelectedFactory] = useState<string>("all");
@@ -79,20 +81,29 @@ export default function ProductionStandardsPage() {
     penaltyPerUnit: 0,
   });
 
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1,
+    meta: { maxBonus: 0, maxPenalty: 0 },
+  });
+
   useEffect(() => {
     const loadInitData = async () => {
       setLoading(true);
       try {
         const [vtRes, fRes] = await Promise.all([
-          api.getVehicleTypes({ active: true }),
+          api.getVehicleTypes({ active: true, limit: 100 }),
           isAdmin
             ? api.getFactories()
             : Promise.resolve({ data: { data: [] } }),
         ]);
-        const types = vtRes.data.data || [];
+        const types = (vtRes as any).data.data || [];
         setVehicleTypes(types);
         if (types.length > 0) setSelectedVehicleType(types[0]);
-        if (isAdmin) setFactories(fRes.data.data || []);
+        if (isAdmin) setFactories((fRes as any).data.data || []);
       } catch {
         toast.error("Lỗi tải dữ liệu ban đầu");
       } finally {
@@ -107,16 +118,29 @@ export default function ProductionStandardsPage() {
       loadStandards();
       loadOperationsForVehicleType();
     }
-  }, [selectedVehicleType, selectedFactory]);
+  }, [selectedVehicleType, selectedFactory, pagination.page, pagination.limit]);
 
   const loadStandards = async () => {
     try {
-      const query: any = { vehicleTypeId: selectedVehicleType._id };
+      const query: any = {
+        vehicleTypeId: selectedVehicleType._id,
+        page: pagination.page,
+        limit: pagination.limit,
+        search: searchTerm || undefined,
+      };
       if (selectedFactory !== "all") {
         query.factoryId = selectedFactory;
       }
       const res = await api.getProductionStandards(query);
       setStandards(res.data.data || []);
+      if (res.data.pagination) {
+        setPagination((prev) => ({
+          ...prev,
+          total: res.data.pagination.total,
+          totalPages: res.data.pagination.totalPages,
+          meta: res.data.meta || { maxBonus: 0, maxPenalty: 0 },
+        }));
+      }
       setEditedStandards({});
       setHasChanges(false);
     } catch {
@@ -128,12 +152,16 @@ export default function ProductionStandardsPage() {
     try {
       const processRes = await api.getProcesses({
         vehicleTypeId: selectedVehicleType._id,
+        limit: 100,
       });
-      const processes = processRes.data.data || [];
+      const processes = (processRes as any).data.data || [];
       let allOperations: any[] = [];
       for (const process of processes) {
-        const opRes = await api.getOperations({ processId: process._id });
-        const ops = (opRes.data.data || []).map((op: any) => ({
+        const opRes = await api.getOperations({
+          processId: process._id,
+          limit: 100,
+        });
+        const ops = ((opRes as any).data.data || []).map((op: any) => ({
           ...op,
           processName: process.name,
         }));
@@ -222,33 +250,8 @@ export default function ProductionStandardsPage() {
     return { bg: "bg-slate-100", color: "text-slate-600", text: "KHÁC" };
   };
 
-  const filteredStandards = standards.filter((std) => {
-    if (!searchTerm) return true;
-    const search = searchTerm.toLowerCase();
-    return (
-      std.operationId?.name?.toLowerCase().includes(search) ||
-      std.operationId?.code?.toLowerCase().includes(search)
-    );
-  });
-
-  const maxBonus = standards.reduce(
-    (max, s) =>
-      Math.max(
-        max,
-        (s.bonusPerUnit || 0) *
-          (s.operationId?.standardQuantity || s.expectedQuantity || 0),
-      ),
-    0,
-  );
-  const maxPenalty = standards.reduce(
-    (max, s) =>
-      Math.max(
-        max,
-        (s.penaltyPerUnit || 0) *
-          (s.operationId?.standardQuantity || s.expectedQuantity || 0),
-      ),
-    0,
-  );
+  const maxBonusValues = pagination.meta?.maxBonus || 0;
+  const maxPenaltyValues = pagination.meta?.maxPenalty || 0;
   const avgEfficiency = 94.5;
 
   if (loading) {
@@ -351,7 +354,7 @@ export default function ProductionStandardsPage() {
                 <RefreshCw className="w-4 h-4 mr-1" /> Đặt lại
               </Button>
               <Button
-                disabled={!hasChanges || !isFacManager}
+                disabled={!hasChanges || !canEdit}
                 onClick={handleSaveChanges}
                 className="bg-[#0077c0] hover:bg-[#005fa3]"
               >
@@ -394,14 +397,14 @@ export default function ProductionStandardsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredStandards.length === 0 ? (
+                {standards.length === 0 ? (
                   <tr>
                     <td
                       colSpan={6}
                       className="text-center py-10 text-slate-400"
                     >
                       Chưa có định mức.{" "}
-                      {isFacManager && (
+                      {canEdit && (
                         <button
                           className="text-[#0077c0] hover:underline"
                           onClick={() => {
@@ -420,7 +423,7 @@ export default function ProductionStandardsPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredStandards.map((std) => {
+                  standards.map((std) => {
                     const tag = getProcessTag(std.operationId?.processId?.name);
                     const currentValues = editedStandards[std._id] || {};
                     return (
@@ -462,7 +465,7 @@ export default function ProductionStandardsPage() {
                             <Input
                               type="number"
                               min={0}
-                              disabled={!isFacManager}
+                              disabled={!canEdit}
                               className="w-[100px] text-center border-emerald-200 bg-emerald-50/50"
                               value={
                                 currentValues.bonusPerUnit ??
@@ -485,7 +488,7 @@ export default function ProductionStandardsPage() {
                             <Input
                               type="number"
                               min={0}
-                              disabled={!isFacManager}
+                              disabled={!canEdit}
                               className="w-[100px] text-center border-red-200 bg-red-50/50"
                               value={
                                 currentValues.penaltyPerUnit ??
@@ -503,7 +506,7 @@ export default function ProductionStandardsPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          {isFacManager && (
+                          {canEdit && (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button
@@ -544,9 +547,22 @@ export default function ProductionStandardsPage() {
             </table>
           </div>
           <div className="px-6 py-3 border-t border-slate-200 text-sm text-slate-500">
-            Hiển thị {filteredStandards.length} / {standards.length} thao tác
-            của {selectedVehicleType?.name}
+            Hiển thị {standards.length} / {pagination.total} thao tác của{" "}
+            {selectedVehicleType?.name}
           </div>
+
+          <Pagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            limit={pagination.limit}
+            total={pagination.total}
+            onPageChange={(p: number) =>
+              setPagination((prev) => ({ ...prev, page: p }))
+            }
+            onLimitChange={(l: number) =>
+              setPagination((prev) => ({ ...prev, limit: l, page: 1 }))
+            }
+          />
         </Card>
       )}
 
@@ -559,7 +575,7 @@ export default function ProductionStandardsPage() {
             </div>
             <div>
               <div className="text-2xl font-bold">
-                {formatCurrency(maxBonus)}
+                {formatCurrency(maxBonusValues)}
               </div>
               <div className="text-xs text-slate-500">đ/ca</div>
               <div className="text-xs text-slate-500">Thưởng tối đa</div>
@@ -573,7 +589,7 @@ export default function ProductionStandardsPage() {
             </div>
             <div>
               <div className="text-2xl font-bold">
-                {formatCurrency(maxPenalty)}
+                {formatCurrency(maxPenaltyValues)}
               </div>
               <div className="text-xs text-slate-500">đ/ca</div>
               <div className="text-xs text-slate-500">Phạt tối đa</div>

@@ -1,22 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
-import Cookies from "js-cookie";
-import dayjs from "dayjs";
-import {
-  Plus,
-  Play,
-  CheckCircle,
-  Trash2,
-  Eye,
-  Maximize2,
-  Loader2,
-} from "lucide-react";
+import { Plus, Search, Maximize2, Trash2, Eye, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -42,71 +36,85 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import * as api from "../../services/api";
+import { toast } from "sonner";
+import * as api from "@/services/api";
+import Cookies from "js-cookie";
+import dayjs from "dayjs";
+import { Pagination } from "@/components/shared/Pagination";
 
 const statusMap: Record<string, { label: string; className: string }> = {
-  pending: {
-    label: "Chờ",
-    className: "bg-amber-100 text-amber-700 border-amber-200",
-  },
-  in_progress: {
-    label: "Đang thực hiện",
+  active: {
+    label: "Đang sản xuất",
     className: "bg-blue-100 text-blue-700 border-blue-200",
   },
   completed: {
     label: "Hoàn thành",
     className: "bg-emerald-100 text-emerald-700 border-emerald-200",
   },
+  paused: {
+    label: "Tạm dừng",
+    className: "bg-amber-100 text-amber-700 border-amber-200",
+  },
   cancelled: {
     label: "Đã hủy",
     className: "bg-red-100 text-red-700 border-red-200",
+  },
+  draft: {
+    label: "Nháp",
+    className: "bg-slate-100 text-slate-700 border-slate-200",
   },
 };
 
 export default function ProductionOrdersPage() {
   const navigate = useNavigate();
+  const user = JSON.parse(Cookies.get("user") || "{}");
+  const roleCode = (user.roleCode || user.role || "").toUpperCase();
+  const isAdmin = roleCode === "ADMIN";
+  const isFacManager = roleCode === "FAC_MANAGER";
+  const isSupervisor = roleCode === "SUPERVISOR";
+  const canManage = isAdmin || isFacManager || isSupervisor;
+
   const [orders, setOrders] = useState<any[]>([]);
   const [vehicleTypes, setVehicleTypes] = useState<any[]>([]);
+  const [factories, setFactories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [detailModal, setDetailModal] = useState<any>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [factories, setFactories] = useState<any[]>([]);
   const [selectedFactory, setSelectedFactory] = useState<string>("all");
-  const user = JSON.parse(Cookies.get("user") || "{}");
-  const roleCode = user.roleCode || user.role;
-  const isAdmin = roleCode === "ADMIN" || roleCode === "admin";
-  const isFacManager = roleCode === "FAC_MANAGER" || roleCode === "fac_manager";
-  const isSupervisor = roleCode === "SUPERVISOR" || roleCode === "supervisor";
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // Form state
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1,
+  });
+
   const [formData, setFormData] = useState({
     vehicleTypeId: "",
-    factoryId: "",
+    factoryId: user.factoryId || "",
     quantity: 1,
     startDate: dayjs().format("YYYY-MM-DD"),
     expectedEndDate: "",
+    note: "",
     frameNumbers: "",
     engineNumbers: "",
   });
 
   useEffect(() => {
     loadData();
-  }, [selectedFactory]);
+  }, [selectedFactory, pagination.page, pagination.limit]);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -116,17 +124,29 @@ export default function ProductionOrdersPage() {
   }, []);
 
   const loadData = async () => {
+    setLoading(true);
     try {
       const [ordersRes, vtRes, fRes] = await Promise.all([
-        api.getProductionOrders(
-          selectedFactory !== "all" ? { factoryId: selectedFactory } : {},
-        ),
-        api.getVehicleTypes({ active: true }),
+        api.getProductionOrders({
+          factoryId: selectedFactory !== "all" ? selectedFactory : undefined,
+          page: pagination.page,
+          limit: pagination.limit,
+          search: searchTerm || undefined,
+        }),
+        api.getVehicleTypes({ active: true, limit: 100 }),
         isAdmin ? api.getFactories() : Promise.resolve({ data: { data: [] } }),
       ]);
+
       setOrders(ordersRes.data.data || []);
+      if (ordersRes.data.pagination) {
+        setPagination((prev) => ({
+          ...prev,
+          total: ordersRes.data.pagination.total,
+          totalPages: ordersRes.data.pagination.totalPages,
+        }));
+      }
       setVehicleTypes(vtRes.data.data || []);
-      if (isAdmin) setFactories(fRes.data.data || []);
+      if (isAdmin) setFactories((fRes as any).data.data || []);
     } catch {
       toast.error("Lỗi tải dữ liệu");
     } finally {
@@ -134,47 +154,32 @@ export default function ProductionOrdersPage() {
     }
   };
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    loadData();
+  };
+
   const handleSubmit = async () => {
     try {
       const data = {
         ...formData,
-        quantity: Number(formData.quantity),
-        factoryId: isAdmin ? formData.factoryId : undefined,
         frameNumbers: formData.frameNumbers
-          ? formData.frameNumbers.split("\n").filter(Boolean)
-          : [],
+          .split("\n")
+          .map((s) => s.trim())
+          .filter(Boolean),
         engineNumbers: formData.engineNumbers
-          ? formData.engineNumbers.split("\n").filter(Boolean)
-          : [],
-
-        expectedEndDate: formData.expectedEndDate || undefined,
+          .split("\n")
+          .map((s) => s.trim())
+          .filter(Boolean),
       };
-      await api.createProductionOrder(data);
+      await api.createProductionOrder(data as any);
       toast.success("Tạo lệnh thành công");
       setModalOpen(false);
-      setFormData({
-        vehicleTypeId: "",
-        factoryId: "",
-        quantity: 1,
-        startDate: dayjs().format("YYYY-MM-DD"),
-        expectedEndDate: "",
-        frameNumbers: "",
-        engineNumbers: "",
-      });
-
+      resetForm();
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
-    }
-  };
-
-  const handleStatusChange = async (id: string, status: string) => {
-    try {
-      await api.updateProductionOrderStatus(id, status);
-      toast.success("Cập nhật thành công");
-      loadData();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
+      toast.error(err.response?.data?.error?.message || "Lỗi tạo lệnh");
     }
   };
 
@@ -184,383 +189,398 @@ export default function ProductionOrdersPage() {
       toast.success("Xóa thành công");
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
+      toast.error(err.response?.data?.error?.message || "Lỗi khi xóa");
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[300px]">
-        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-      </div>
-    );
-  }
+  const resetForm = () => {
+    setFormData({
+      vehicleTypeId: "",
+      factoryId: user.factoryId || "",
+      quantity: 1,
+      startDate: dayjs().format("YYYY-MM-DD"),
+      expectedEndDate: "",
+      note: "",
+      frameNumbers: "",
+      engineNumbers: "",
+    });
+  };
 
   return (
     <TooltipProvider>
-      <div>
-        <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-          <h2 className="text-xl font-bold text-slate-800">📋 Lệnh Sản Xuất</h2>
-          <div className="flex gap-2 items-center">
-            {isAdmin && (
+      <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+        <div className="flex items-center gap-4 flex-wrap flex-1">
+          <h2 className="text-xl font-bold text-slate-800 tracking-tight">
+            📋 Lệnh Sản Xuất
+          </h2>
+
+          <form
+            onSubmit={handleSearch}
+            className="flex gap-2 min-w-[200px] flex-1 max-w-sm"
+          >
+            <Input
+              placeholder="Tìm mã lệnh..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-9 shadow-sm"
+            />
+            <Button type="submit" variant="secondary" size="sm" className="h-9">
+              Tìm
+            </Button>
+          </form>
+
+          {isAdmin && (
+            <div className="flex items-center gap-2 min-w-[200px]">
+              <span className="text-sm font-medium text-slate-500 whitespace-nowrap">
+                Nhà máy:
+              </span>
               <Select
                 value={selectedFactory}
                 onValueChange={setSelectedFactory}
               >
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-[180px] h-9 shadow-sm">
                   <SelectValue placeholder="Tất cả nhà máy" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tất cả nhà máy</SelectItem>
                   {factories.map((f) => (
                     <SelectItem key={f._id} value={f._id}>
-                      🏭 {f.name}
+                      {f.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            )}
-            {isFacManager && (
-              <Button
-                onClick={() => setModalOpen(true)}
-                className="bg-[#0077c0] hover:bg-[#005fa3]"
-              >
-                <Plus className="w-4 h-4 mr-1" /> Tạo
-              </Button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
+        {canManage && (
+          <Button
+            onClick={() => {
+              resetForm();
+              setModalOpen(true);
+            }}
+            className="bg-[#0077c0] hover:bg-[#005fa3] transition-all active:scale-95"
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            <span className="hidden sm:inline">Tạo lệnh mới</span>
+            <span className="sm:hidden">Tạo mới</span>
+          </Button>
+        )}
+      </div>
 
-        {isMobile ? (
-          /* Mobile Card View */
-          <div className="space-y-3">
-            {orders.map((order) => {
-              const s = statusMap[order.status] || {
-                label: order.status,
-                className: "bg-gray-100 text-gray-700",
-              };
-              return (
-                <Card key={order._id} className="border-slate-200">
-                  <CardContent className="pt-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <span className="font-bold text-base">
-                          {order.orderCode}
-                        </span>
-                        <div className="text-sm text-slate-600">
-                          {order.vehicleTypeId?.code} -{" "}
-                          {order.vehicleTypeId?.name}
-                        </div>
-                      </div>
-                      <Badge variant="outline" className={s.className}>
-                        {s.label}
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm mb-3">
-                      <div>
-                        <span className="text-slate-500">SL:</span>{" "}
-                        <strong>{order.quantity}</strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Bắt đầu:</span>{" "}
-                        {dayjs(order.startDate).format("DD/MM")}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2 pt-3 border-t border-slate-100">
-                      {isFacManager && order.status === "pending" && (
-                        <Button
-                          size="sm"
-                          className="bg-[#0077c0] hover:bg-[#005fa3]"
-                          onClick={() =>
-                            handleStatusChange(order._id, "in_progress")
-                          }
-                        >
-                          <Play className="w-3.5 h-3.5 mr-1" /> Bắt đầu
-                        </Button>
-                      )}
-                      {isFacManager && order.status === "in_progress" && (
-                        <Button
-                          size="sm"
-                          className="bg-emerald-500 hover:bg-emerald-600"
-                          onClick={() =>
-                            handleStatusChange(order._id, "completed")
-                          }
-                        >
-                          <CheckCircle className="w-3.5 h-3.5 mr-1" /> Hoàn
-                          thành
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setDetailModal(order)}
-                      >
-                        <Maximize2 className="w-3.5 h-3.5 mr-1" /> Chi tiết
-                      </Button>
-                      {isFacManager &&
-                        order.status !== "in_progress" &&
-                        order.status !== "completed" && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-red-500"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 mr-1" /> Xóa
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                  Xóa lệnh sản xuất này?
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Hành động không thể hoàn tác
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Hủy</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(order._id)}
-                                  className="bg-red-500 hover:bg-red-600"
-                                >
-                                  Xóa
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                    </div>
-                  </CardContent>
+      {loading ? (
+        <div className="flex items-center justify-center h-[400px]">
+          <Loader2 className="w-8 h-8 animate-spin text-[#0077c0]" />
+        </div>
+      ) : (
+        <>
+          {isMobile ? (
+            <div className="space-y-4">
+              {orders.length === 0 ? (
+                <Card className="p-8 text-center border-dashed border-2 border-slate-200">
+                  <p className="text-slate-500">Chưa có lệnh sản xuất nào</p>
                 </Card>
-              );
-            })}
-          </div>
-        ) : (
-          /* Desktop Table View */
-          <Card className="border-slate-200">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Mã lệnh</TableHead>
-                  <TableHead>Loại xe</TableHead>
-                  <TableHead className="text-center w-[60px]">SL</TableHead>
-                  <TableHead className="w-[80px]">Ngày</TableHead>
-                  <TableHead>Nhà máy</TableHead>
-                  <TableHead className="w-[130px]">Trạng thái</TableHead>
-                  <TableHead className="w-[140px] text-right">
-                    Thao tác
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orders.map((order) => {
-                  const s = statusMap[order.status] || {
+              ) : (
+                orders.map((order) => {
+                  const status = statusMap[order.status] || {
                     label: order.status,
-                    className: "bg-gray-100 text-gray-700",
+                    className: "bg-slate-100",
                   };
                   return (
-                    <TableRow key={order._id}>
-                      <TableCell className="font-bold">
-                        {order.orderCode}
-                      </TableCell>
-                      <TableCell>
-                        {order.vehicleTypeId ? order.vehicleTypeId.code : "-"}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {order.quantity}
-                      </TableCell>
-                      <TableCell>
-                        {dayjs(order.startDate).format("DD/MM")}
-                      </TableCell>
-                      <TableCell className="text-xs text-slate-500">
-                        {order.factoryId?.name || "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={s.className}>
-                          {s.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8"
-                                onClick={() =>
-                                  navigate(
-                                    `/admin/production-orders/${order._id}`,
-                                  )
-                                }
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Xem chi tiết</TooltipContent>
-                          </Tooltip>
-                          {isFacManager && order.status === "pending" && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  className="h-8 w-8 bg-[#0077c0] hover:bg-[#005fa3]"
-                                  onClick={() =>
-                                    handleStatusChange(order._id, "in_progress")
-                                  }
-                                >
-                                  <Play className="w-4 h-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Bắt đầu</TooltipContent>
-                            </Tooltip>
-                          )}
-
-                          {isFacManager && order.status === "in_progress" && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  className="h-8 w-8 bg-emerald-500 hover:bg-emerald-600"
-                                  onClick={() =>
-                                    handleStatusChange(order._id, "completed")
-                                  }
-                                >
-                                  <CheckCircle className="w-4 h-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Hoàn thành</TooltipContent>
-                            </Tooltip>
-                          )}
-
-                          {isFacManager &&
-                            order.status !== "in_progress" &&
-                            order.status !== "completed" && (
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-8 w-8 text-red-500"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      Xóa lệnh này?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Hành động không thể hoàn tác
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Hủy</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDelete(order._id)}
-                                      className="bg-red-500 hover:bg-red-600"
-                                    >
-                                      Xóa
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            )}
+                    <Card
+                      key={order._id}
+                      className="border-slate-200 hover:shadow-md transition-shadow cursor-pointer overflow-hidden group"
+                      onClick={() => setDetailModal(order)}
+                    >
+                      <CardContent className="pt-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <div className="font-bold text-slate-800 text-lg group-hover:text-[#0077c0] transition-colors">
+                              {order.orderCode}
+                            </div>
+                            <div className="text-sm font-medium text-slate-600 mt-0.5">
+                              {order.vehicleTypeId?.name}
+                            </div>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className={`${status.className} border shadow-sm`}
+                          >
+                            {status.label}
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 mt-4 text-sm bg-slate-50 p-3 rounded-lg border border-slate-100">
+                          <div>
+                            <div className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">
+                              Số lượng
+                            </div>
+                            <div className="font-bold text-slate-700">
+                              {order.quantity} xe
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-1">
+                              Bắt đầu
+                            </div>
+                            <div className="font-semibold text-slate-600">
+                              {dayjs(order.startDate).format("DD/MM/YYYY")}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
+            </div>
+          ) : (
+            <Card className="border-slate-200 shadow-sm overflow-hidden bg-white">
+              <Table>
+                <TableHeader className="bg-slate-50/80 border-b border-slate-200">
+                  <TableRow>
+                    <TableHead className="font-bold text-slate-700 w-[140px]">
+                      Mã lệnh
+                    </TableHead>
+                    <TableHead className="font-bold text-slate-700">
+                      Loại xe
+                    </TableHead>
+                    <TableHead className="font-bold text-slate-700 text-center">
+                      Số lượng
+                    </TableHead>
+                    <TableHead className="font-bold text-slate-700">
+                      Trạng thái
+                    </TableHead>
+                    <TableHead className="font-bold text-slate-700">
+                      Ngày bắt đầu
+                    </TableHead>
+                    <TableHead className="font-bold text-slate-700 text-right w-[120px]">
+                      Thao tác
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {orders.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={6}
+                        className="text-center py-16 text-slate-400"
+                      >
+                        <div className="flex flex-col items-center">
+                          <Maximize2 className="w-12 h-12 mb-2 opacity-20" />
+                          <p>Chưa có lệnh sản xuất nào trong danh sách</p>
                         </div>
                       </TableCell>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </Card>
-        )}
+                  ) : (
+                    orders.map((order) => {
+                      const status = statusMap[order.status] || {
+                        label: order.status,
+                        className: "bg-slate-100",
+                      };
+                      return (
+                        <TableRow
+                          key={order._id}
+                          className="hover:bg-slate-50/50 transition-colors group"
+                        >
+                          <TableCell className="font-bold text-slate-900 font-mono">
+                            {order.orderCode}
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-medium text-slate-700">
+                              {order.vehicleTypeId?.name}
+                            </div>
+                            <div className="text-xs text-slate-400 font-mono">
+                              {order.vehicleTypeId?.code}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge
+                              variant="secondary"
+                              className="font-bold text-slate-700 bg-slate-100 px-2.5"
+                            >
+                              {order.quantity}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={`${status.className} border shadow-sm font-medium`}
+                            >
+                              {status.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-slate-600">
+                            {dayjs(order.startDate).format("DD/MM/YYYY")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-[#0077c0] hover:bg-blue-50"
+                                    onClick={() => setDetailModal(order)}
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Xem chi tiết</TooltipContent>
+                              </Tooltip>
 
-        {/* Detail Modal */}
-        <Dialog
-          open={!!detailModal}
-          onOpenChange={(open) => {
-            if (!open) setDetailModal(null);
-          }}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Chi tiết: {detailModal?.orderCode}</DialogTitle>
-            </DialogHeader>
-            {detailModal && (
-              <div className="space-y-3 mt-2">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <span className="text-slate-500">Loại xe:</span>{" "}
-                    <span className="font-semibold">
-                      {detailModal.vehicleTypeId?.name}
-                    </span>
+                              {isAdmin && order.status === "pending" && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-red-500 hover:bg-red-50"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>
+                                        Xóa lệnh sản xuất?
+                                      </AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Bạn có chắc chắn muốn xóa lệnh{" "}
+                                        <span className="font-bold">
+                                          {order.orderCode}
+                                        </span>
+                                        ?
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Hủy</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDelete(order._id)}
+                                        className="bg-red-600 hover:bg-red-700"
+                                      >
+                                        Xóa
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          )}
+
+          <Pagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            limit={pagination.limit}
+            total={pagination.total}
+            onPageChange={(p: number) =>
+              setPagination((prev) => ({ ...prev, page: p }))
+            }
+            onLimitChange={(l: number) =>
+              setPagination((prev) => ({ ...prev, limit: l, page: 1 }))
+            }
+          />
+        </>
+      )}
+
+      {/* Detail Modal */}
+      <Dialog
+        open={!!detailModal}
+        onOpenChange={(open) => !open && setDetailModal(null)}
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Chi tiết lệnh: {detailModal?.orderCode}</DialogTitle>
+          </DialogHeader>
+          {detailModal && (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <div className="text-slate-500 mb-1">Loại xe</div>
+                  <div className="font-bold text-slate-800">
+                    {detailModal.vehicleTypeId?.name}
                   </div>
-                  <div>
-                    <span className="text-slate-500">Số lượng:</span>{" "}
-                    <span className="font-semibold">
-                      {detailModal.quantity}
-                    </span>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <div className="text-slate-500 mb-1">Số lượng</div>
+                  <div className="font-bold text-slate-800">
+                    {detailModal.quantity} xe
                   </div>
-                  <div>
-                    <span className="text-slate-500">Bắt đầu:</span>{" "}
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <div className="text-slate-500 mb-1">Ngày bắt đầu</div>
+                  <div className="font-bold text-slate-800">
                     {dayjs(detailModal.startDate).format("DD/MM/YYYY")}
                   </div>
-                  <div>
-                    <span className="text-slate-500">Dự kiến:</span>{" "}
+                </div>
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <div className="text-slate-500 mb-1">Dự kiến kết thúc</div>
+                  <div className="font-bold text-slate-800">
                     {detailModal.expectedEndDate
                       ? dayjs(detailModal.expectedEndDate).format("DD/MM/YYYY")
                       : "-"}
                   </div>
                 </div>
-                <div>
-                  <p className="text-sm text-slate-500 mb-1">
-                    Số khung ({detailModal.frameNumbers?.length || 0}):
-                  </p>
-                  <p className="font-mono text-xs bg-slate-50 p-2 rounded">
-                    {detailModal.frameNumbers?.join(", ") || "-"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500 mb-1">
-                    Số động cơ ({detailModal.engineNumbers?.length || 0}):
-                  </p>
-                  <p className="font-mono text-xs bg-slate-50 p-2 rounded">
-                    {detailModal.engineNumbers?.join(", ") || "-"}
-                  </p>
-                </div>
-                {detailModal.note && (
-                  <div>
-                    <span className="text-sm text-slate-500">Ghi chú:</span>{" "}
-                    <span className="text-sm">{detailModal.note}</span>
-                  </div>
-                )}
               </div>
-            )}
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setDetailModal(null)}>
-                Đóng
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
-        {/* Create Modal */}
-        <Dialog
-          open={modalOpen}
-          onOpenChange={(open) => {
-            if (!open) setModalOpen(false);
-          }}
-        >
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Tạo Lệnh Sản Xuất</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 mt-2">
-              <div className="space-y-1.5">
+              <div className="space-y-2">
+                <Label className="text-slate-500">
+                  Danh sách số khung ({detailModal.frameNumbers?.length || 0})
+                </Label>
+                <div className="max-h-[100px] overflow-y-auto font-mono text-xs bg-slate-50 p-3 rounded-lg border border-slate-100 leading-relaxed italic">
+                  {detailModal.frameNumbers?.join(", ") || "Chưa cập nhật"}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-slate-500">
+                  Danh sách số máy ({detailModal.engineNumbers?.length || 0})
+                </Label>
+                <div className="max-h-[100px] overflow-y-auto font-mono text-xs bg-slate-50 p-3 rounded-lg border border-slate-100 leading-relaxed italic">
+                  {detailModal.engineNumbers?.join(", ") || "Chưa cập nhật"}
+                </div>
+              </div>
+
+              {detailModal.note && (
+                <div className="space-y-1">
+                  <Label className="text-slate-500">Ghi chú</Label>
+                  <p className="text-sm p-3 bg-slate-50 rounded-lg border border-slate-100">
+                    {detailModal.note}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setDetailModal(null)}
+              className="w-full sm:w-auto"
+            >
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Modal */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-slate-800">
+              Tạo Lệnh Sản Xuất Mới
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-5 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label>Loại xe *</Label>
                 <Select
                   value={formData.vehicleTypeId}
@@ -568,13 +588,13 @@ export default function ProductionOrdersPage() {
                     setFormData({ ...formData, vehicleTypeId: v })
                   }
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="-- Chọn --" />
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Chọn loại xe" />
                   </SelectTrigger>
                   <SelectContent>
                     {vehicleTypes.map((vt) => (
                       <SelectItem key={vt._id} value={vt._id}>
-                        {vt.code} - {vt.name}
+                        {vt.name} ({vt.code})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -582,29 +602,31 @@ export default function ProductionOrdersPage() {
               </div>
 
               {isAdmin && (
-                <div className="space-y-1.5">
-                  <Label>Nhà máy sản xuất *</Label>
+                <div className="space-y-2">
+                  <Label>Nhà máy *</Label>
                   <Select
                     value={formData.factoryId}
                     onValueChange={(v) =>
                       setFormData({ ...formData, factoryId: v })
                     }
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="-- Chọn nhà máy --" />
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Chọn nhà máy" />
                     </SelectTrigger>
                     <SelectContent>
                       {factories.map((f) => (
                         <SelectItem key={f._id} value={f._id}>
-                          🏭 {f.name}
+                          {f.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
               )}
+            </div>
 
-              <div className="space-y-1.5">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label>Số lượng *</Label>
                 <Input
                   type="number"
@@ -616,73 +638,83 @@ export default function ProductionOrdersPage() {
                       quantity: parseInt(e.target.value) || 1,
                     })
                   }
+                  className="h-10"
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Ngày bắt đầu *</Label>
-                  <Input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, startDate: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Dự kiến</Label>
-                  <Input
-                    type="date"
-                    value={formData.expectedEndDate}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        expectedEndDate: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Số khung (mỗi dòng 1 số)</Label>
-                <textarea
-                  className="w-full border border-slate-200 rounded-md p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#0077c0]/20 focus:border-[#0077c0]"
-                  rows={2}
-                  value={formData.frameNumbers}
+              <div className="space-y-2">
+                <Label>Ngày bắt đầu *</Label>
+                <Input
+                  type="date"
+                  value={formData.startDate}
                   onChange={(e) =>
-                    setFormData({ ...formData, frameNumbers: e.target.value })
+                    setFormData({ ...formData, startDate: e.target.value })
                   }
-                  placeholder={"XDD-A1-001\nXDD-A1-002"}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Số động cơ (mỗi dòng 1 số)</Label>
-                <textarea
-                  className="w-full border border-slate-200 rounded-md p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#0077c0]/20 focus:border-[#0077c0]"
-                  rows={2}
-                  value={formData.engineNumbers}
-                  onChange={(e) =>
-                    setFormData({ ...formData, engineNumbers: e.target.value })
-                  }
-                  placeholder={"DC-A1-001\nDC-A1-002"}
+                  className="h-10"
                 />
               </div>
             </div>
-            <DialogFooter className="mt-4">
-              <Button variant="outline" onClick={() => setModalOpen(false)}>
-                Hủy
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                className="bg-[#0077c0] hover:bg-[#005fa3]"
-              >
-                Tạo
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+
+            <div className="space-y-2">
+              <Label>Dự kiến kết thúc</Label>
+              <Input
+                type="date"
+                value={formData.expectedEndDate}
+                onChange={(e) =>
+                  setFormData({ ...formData, expectedEndDate: e.target.value })
+                }
+                className="h-10"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Danh sách số khung (Mỗi số 1 dòng)</Label>
+              <textarea
+                className="w-full min-h-[80px] border border-slate-200 rounded-md p-3 text-sm font-mono resize-none focus:ring-2 focus:ring-[#0077c0]/20 transition-all"
+                value={formData.frameNumbers}
+                onChange={(e) =>
+                  setFormData({ ...formData, frameNumbers: e.target.value })
+                }
+                placeholder="VD:&#10;XDD-001&#10;XDD-002"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Danh sách số máy (Mỗi số 1 dòng)</Label>
+              <textarea
+                className="w-full min-h-[80px] border border-slate-200 rounded-md p-3 text-sm font-mono resize-none focus:ring-2 focus:ring-[#0077c0]/20 transition-all"
+                value={formData.engineNumbers}
+                onChange={(e) =>
+                  setFormData({ ...formData, engineNumbers: e.target.value })
+                }
+                placeholder="VD:&#10;MS-001&#10;MS-002"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Ghi chú</Label>
+              <Input
+                value={formData.note}
+                onChange={(e) =>
+                  setFormData({ ...formData, note: e.target.value })
+                }
+                placeholder="Thêm thông tin bổ sung nếu cần..."
+                className="h-10"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setModalOpen(false)}>
+              Hủy
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              className="bg-[#0077c0] hover:bg-[#005fa3]"
+            >
+              Tạo Lệnh
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 }

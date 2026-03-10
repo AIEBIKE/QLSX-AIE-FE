@@ -22,6 +22,7 @@ import {
   User,
   Loader2,
 } from "lucide-react";
+import { Pagination } from "@/components/shared/Pagination";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -184,7 +185,7 @@ export default function UsersManagementPage() {
     code: "",
     name: "",
     role: "worker" as string,
-    password: "",
+    password: "123456",
     factoryId: "",
     active: true,
     dateOfBirth: "",
@@ -212,13 +213,40 @@ export default function UsersManagementPage() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Pagination state
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1,
+    meta: { total: 0, active: 0, inactive: 0 },
+  });
+
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const query: any = {};
-      if (selectedFactory !== "all") query.factoryId = selectedFactory;
-      const res = await api.getUsers(query);
+      const res = await api.getUsers({
+        factoryId: selectedFactory !== "all" ? selectedFactory : undefined,
+        role: filterRole !== "all" ? filterRole : undefined,
+        active:
+          filterStatus === "active"
+            ? true
+            : filterStatus === "inactive"
+              ? false
+              : undefined,
+        search: searchText || undefined,
+        page: pagination.page,
+        limit: pagination.limit,
+      });
       setUsers(res.data.data || []);
+      if (res.data.pagination) {
+        setPagination((prev) => ({
+          ...prev,
+          total: res.data.pagination.total,
+          totalPages: res.data.pagination.totalPages,
+          meta: res.data.meta || { total: 0, active: 0, inactive: 0 },
+        }));
+      }
     } catch (error: any) {
       toast.error("Lỗi tải danh sách: " + error.message);
     } finally {
@@ -238,7 +266,25 @@ export default function UsersManagementPage() {
   useEffect(() => {
     loadUsers();
     loadPendingUsers();
-  }, [selectedFactory]);
+  }, [
+    selectedFactory,
+    filterRole,
+    filterStatus,
+    pagination.page,
+    pagination.limit,
+  ]);
+
+  // Handle Search with debounce or simple button?
+  // User can click a search button or we can debounce.
+  // The current UI has the search input. Let's make it trigger loadUsers on Enter or button.
+  // Actually, let's keep it simple: re-fetch when searchText changes (debounced would be better but let's see).
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPagination((prev) => ({ ...prev, page: 1 }));
+      loadUsers();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchText]);
 
   // Fetch next employee code based on role
   const fetchNextCode = useCallback(async (role: string) => {
@@ -281,33 +327,6 @@ export default function UsersManagementPage() {
       );
     }
   };
-
-  // Statistics
-  const stats = useMemo(() => {
-    const total = users.length;
-    const workers = users.filter((u) => u.role === "worker").length;
-    const supervisors = users.filter((u) => u.role === "supervisor").length;
-    const admins = users.filter((u) => u.role === "admin").length;
-    const active = users.filter((u) => u.active).length;
-    const inactive = total - active;
-    return { total, workers, supervisors, admins, active, inactive };
-  }, [users]);
-
-  // Filtered users
-  const filteredUsers = useMemo(() => {
-    return users.filter((user) => {
-      const matchSearch =
-        searchText === "" ||
-        user.name.toLowerCase().includes(searchText.toLowerCase()) ||
-        user.code.toLowerCase().includes(searchText.toLowerCase());
-      const matchRole = filterRole === "all" || user.role === filterRole;
-      const matchStatus =
-        filterStatus === "all" ||
-        (filterStatus === "active" && user.active) ||
-        (filterStatus === "inactive" && !user.active);
-      return matchSearch && matchRole && matchStatus;
-    });
-  }, [users, searchText, filterRole, filterStatus]);
 
   const handleSubmit = async () => {
     try {
@@ -357,7 +376,7 @@ export default function UsersManagementPage() {
       code: "",
       name: "",
       role: "worker",
-      password: "",
+      password: "123456",
       factoryId: isFacManager ? currentUser.factoryId || "" : "",
       active: true,
       dateOfBirth: "",
@@ -398,37 +417,19 @@ export default function UsersManagementPage() {
   const statCards = [
     {
       label: "Tổng cộng",
-      value: stats.total,
+      value: pagination.meta?.total || 0,
       icon: <Users className="w-4 h-4 text-blue-500" />,
       color: "text-blue-600",
     },
     {
-      label: "Công nhân",
-      value: stats.workers,
-      icon: <User className="w-4 h-4 text-emerald-500" />,
-      color: "text-emerald-600",
-    },
-    {
-      label: "Giám sát",
-      value: stats.supervisors,
-      icon: <Shield className="w-4 h-4 text-blue-500" />,
-      color: "text-blue-600",
-    },
-    {
-      label: "Admin",
-      value: stats.admins,
-      icon: <Crown className="w-4 h-4 text-pink-500" />,
-      color: "text-pink-600",
-    },
-    {
       label: "Hoạt động",
-      value: stats.active,
+      value: pagination.meta?.active || 0,
       icon: <CheckCircle className="w-4 h-4 text-emerald-500" />,
       color: "text-emerald-600",
     },
     {
       label: "Đã khóa",
-      value: stats.inactive,
+      value: pagination.meta?.inactive || 0,
       icon: <XCircle className="w-4 h-4 text-gray-400" />,
       color: "text-gray-500",
     },
@@ -453,15 +454,13 @@ export default function UsersManagementPage() {
               {isFacManager ? "công nhân" : "người dùng"} trong hệ thống
             </p>
           </div>
-          {!isFacManager && (
-            <Button
-              onClick={openCreate}
-              className="bg-[#0077c0] hover:bg-[#005fa3]"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Thêm người dùng
-            </Button>
-          )}
+          <Button
+            onClick={openCreate}
+            className="bg-[#0077c0] hover:bg-[#005fa3]"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            {isFacManager ? "Thêm công nhân" : "Thêm người dùng"}
+          </Button>
         </div>
 
         {/* Stats */}
@@ -690,7 +689,7 @@ export default function UsersManagementPage() {
                   </Select>
                   <div className="flex items-center gap-2 ml-auto">
                     <span className="text-xs text-slate-500">
-                      {filteredUsers.length} / {users.length}
+                      Hiển thị {users.length} / {pagination.total}
                     </span>
                     {!isMobile && (
                       <div className="flex border rounded-md overflow-hidden">
@@ -734,7 +733,7 @@ export default function UsersManagementPage() {
                           <Loader2 className="w-6 h-6 animate-spin mx-auto text-slate-400" />
                         </TableCell>
                       </TableRow>
-                    ) : filteredUsers.length === 0 ? (
+                    ) : users.length === 0 ? (
                       <TableRow>
                         <TableCell
                           colSpan={4}
@@ -744,7 +743,7 @@ export default function UsersManagementPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredUsers.map((u) => {
+                      users.map((u) => {
                         const role = getRoleBadge(u.role);
                         return (
                           <TableRow key={u._id}>
@@ -817,55 +816,53 @@ export default function UsersManagementPage() {
                                     Lịch sử làm việc
                                   </TooltipContent>
                                 </Tooltip>
-                                {!isFacManager && (
-                                  <>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          className="h-8 w-8"
-                                          onClick={() => openEdit(u)}
+                                <>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-8 w-8"
+                                        onClick={() => openEdit(u)}
+                                      >
+                                        <Pencil className="w-4 h-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Chỉnh sửa</TooltipContent>
+                                  </Tooltip>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-8 w-8 text-red-500 hover:text-red-600"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>
+                                          Xóa người dùng này?
+                                        </AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Hành động này không thể hoàn tác
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>
+                                          Hủy
+                                        </AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => handleDelete(u._id)}
+                                          className="bg-red-500 hover:bg-red-600"
                                         >
-                                          <Pencil className="w-4 h-4" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>Chỉnh sửa</TooltipContent>
-                                    </Tooltip>
-                                    <AlertDialog>
-                                      <AlertDialogTrigger asChild>
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          className="h-8 w-8 text-red-500 hover:text-red-600"
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </Button>
-                                      </AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                          <AlertDialogTitle>
-                                            Xóa người dùng này?
-                                          </AlertDialogTitle>
-                                          <AlertDialogDescription>
-                                            Hành động này không thể hoàn tác
-                                          </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                          <AlertDialogCancel>
-                                            Hủy
-                                          </AlertDialogCancel>
-                                          <AlertDialogAction
-                                            onClick={() => handleDelete(u._id)}
-                                            className="bg-red-500 hover:bg-red-600"
-                                          >
-                                            Xóa
-                                          </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                      </AlertDialogContent>
-                                    </AlertDialog>
-                                  </>
-                                )}
+                                          Xóa
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
+                                </>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -874,71 +871,84 @@ export default function UsersManagementPage() {
                     )}
                   </TableBody>
                 </Table>
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  limit={pagination.limit}
+                  total={pagination.total}
+                  onPageChange={(p: number) =>
+                    setPagination((prev) => ({ ...prev, page: p }))
+                  }
+                  onLimitChange={(l: number) =>
+                    setPagination((prev) => ({ ...prev, limit: l, page: 1 }))
+                  }
+                />
               </Card>
             ) : (
               /* Card View */
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {filteredUsers.map((u) => {
-                  const role = getRoleBadge(u.role);
-                  return (
-                    <Card
-                      key={u._id}
-                      className={`border-slate-200 ${!u.active ? "opacity-70" : ""}`}
-                    >
-                      <CardContent className="pt-4">
-                        <div className="flex gap-3">
-                          <div className="relative">
-                            <Avatar className="w-11 h-11">
-                              <AvatarFallback
-                                style={{
-                                  backgroundColor: getAvatarColor(u.name),
-                                }}
-                                className="text-white text-sm font-semibold"
-                              >
-                                {getInitials(u.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            {u.active && (
-                              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-sm truncate">
-                              {u.name}
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {users.map((u) => {
+                    const role = getRoleBadge(u.role);
+                    return (
+                      <Card
+                        key={u._id}
+                        className={`border-slate-200 ${!u.active ? "opacity-70" : ""}`}
+                      >
+                        <CardContent className="pt-4">
+                          <div className="flex gap-3">
+                            <div className="relative">
+                              <Avatar className="w-11 h-11">
+                                <AvatarFallback
+                                  style={{
+                                    backgroundColor: getAvatarColor(u.name),
+                                  }}
+                                  className="text-white text-sm font-semibold"
+                                >
+                                  {getInitials(u.name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              {u.active && (
+                                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white" />
+                              )}
                             </div>
-                            <div className="text-xs text-slate-500">
-                              {u.code}
-                            </div>
-                            {u.factoryId && (
-                              <div className="text-xs text-slate-400 flex items-center gap-1 mt-1">
-                                <span>🏭</span>{" "}
-                                {typeof u.factoryId === "object"
-                                  ? u.factoryId.name
-                                  : factories.find((f) => f._id === u.factoryId)
-                                      ?.name || u.factoryId}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-sm truncate">
+                                {u.name}
                               </div>
-                            )}
+                              <div className="text-xs text-slate-500">
+                                {u.code}
+                              </div>
+                              {u.factoryId && (
+                                <div className="text-xs text-slate-400 flex items-center gap-1 mt-1">
+                                  <span>🏭</span>{" "}
+                                  {typeof u.factoryId === "object"
+                                    ? u.factoryId.name
+                                    : factories.find(
+                                        (f) => f._id === u.factoryId,
+                                      )?.name || u.factoryId}
+                                </div>
+                              )}
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className={`h-fit text-xs ${role.className}`}
+                            >
+                              {role.label}
+                            </Badge>
                           </div>
-                          <Badge
-                            variant="outline"
-                            className={`h-fit text-xs ${role.className}`}
-                          >
-                            {role.label}
-                          </Badge>
-                        </div>
 
-                        <div className="flex justify-end gap-1 mt-3 pt-3 border-t border-slate-100">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 text-xs"
-                            onClick={() =>
-                              navigate(`/admin/users/${u._id}/history`)
-                            }
-                          >
-                            <History className="w-3.5 h-3.5 mr-1" /> Lịch sử
-                          </Button>
-                          {!isFacManager && (
+                          <div className="flex justify-end gap-1 mt-3 pt-3 border-t border-slate-100">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 text-xs"
+                              onClick={() =>
+                                navigate(`/admin/users/${u._id}/history`)
+                              }
+                            >
+                              <History className="w-3.5 h-3.5 mr-1" /> Lịch sử
+                            </Button>
                             <>
                               <Button
                                 size="sm"
@@ -979,20 +989,32 @@ export default function UsersManagementPage() {
                                 </AlertDialogContent>
                               </AlertDialog>
                             </>
-                          )}
-                        </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                  {users.length === 0 && (
+                    <Card className="col-span-full">
+                      <CardContent className="py-10 text-center text-slate-500">
+                        Không tìm thấy người dùng phù hợp
                       </CardContent>
                     </Card>
-                  );
-                })}
-                {filteredUsers.length === 0 && (
-                  <Card className="col-span-full">
-                    <CardContent className="py-10 text-center text-slate-500">
-                      Không tìm thấy người dùng phù hợp
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
+                  )}
+                </div>
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  limit={pagination.limit}
+                  total={pagination.total}
+                  onPageChange={(p: number) =>
+                    setPagination((prev) => ({ ...prev, page: p }))
+                  }
+                  onLimitChange={(l: number) =>
+                    setPagination((prev) => ({ ...prev, limit: l, page: 1 }))
+                  }
+                />
+              </>
             )}
           </TabsContent>
         </Tabs>
@@ -1048,7 +1070,6 @@ export default function UsersManagementPage() {
                       setFormData({ ...formData, role: v });
                       if (!editingUser) fetchNextCode(v);
                     }}
-                    disabled={isFacManager && !editingUser}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Chọn vai trò" />
@@ -1062,12 +1083,16 @@ export default function UsersManagementPage() {
                           <SelectItem value="fac_manager">
                             Quản lý nhà máy
                           </SelectItem>
+                        </>
+                      )}
+                      {isFacManager && (
+                        <>
                           <SelectItem value="supervisor">
                             Giám sát sản xuất
                           </SelectItem>
+                          <SelectItem value="worker">Công nhân</SelectItem>
                         </>
                       )}
-                      <SelectItem value="worker">Công nhân</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1080,6 +1105,7 @@ export default function UsersManagementPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
+                  disabled={!!editingUser}
                   placeholder="Nguyễn Văn A"
                 />
               </div>
@@ -1093,6 +1119,7 @@ export default function UsersManagementPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, dateOfBirth: e.target.value })
                     }
+                    disabled={!!editingUser}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -1102,6 +1129,7 @@ export default function UsersManagementPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, citizenId: e.target.value })
                     }
+                    disabled={!!editingUser}
                     placeholder="Số CCCD"
                   />
                 </div>
@@ -1114,6 +1142,7 @@ export default function UsersManagementPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, address: e.target.value })
                   }
+                  disabled={!!editingUser}
                   placeholder="Địa chỉ thường trú"
                 />
               </div>
@@ -1127,6 +1156,7 @@ export default function UsersManagementPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, password: e.target.value })
                     }
+                    disabled={!!editingUser}
                     placeholder={
                       editingUser
                         ? "Để trống nếu không muốn đổi"

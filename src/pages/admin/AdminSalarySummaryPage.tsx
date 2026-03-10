@@ -60,6 +60,8 @@ const getInitials = (name: string) => {
     : name[0].toUpperCase();
 };
 
+import { Pagination } from "@/components/shared/Pagination";
+
 interface WorkerStat {
   user: { _id: string; code: string; name: string };
   totalQuantity: number;
@@ -68,48 +70,66 @@ interface WorkerStat {
   totalNetIncome: number;
   registrationCount: number;
 }
-interface SalaryData {
-  summary: {
-    totalWorkers: number;
-    totalRegistrations: number;
-    totalQuantity: number;
-    totalBonus: number;
-    totalPenalty: number;
-    totalNetIncome: number;
+interface SalaryResponse {
+  data: WorkerStat[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
   };
-  workers: WorkerStat[];
-  chartData: {
-    date: string;
-    bonus: number;
-    penalty: number;
-    quantity: number;
-  }[];
-  dateRange: { start: string; end: string };
+  meta: {
+    summary: {
+      totalWorkers: number;
+      totalRegistrations: number;
+      totalQuantity: number;
+      totalBonus: number;
+      totalPenalty: number;
+      totalNetIncome: number;
+    };
+    chartData: {
+      date: string;
+      bonus: number;
+      penalty: number;
+      quantity: number;
+    }[];
+    dateRange: { start: string; end: string };
+  };
 }
 
 export default function AdminSalarySummaryPage() {
   const [period, setPeriod] = useState("month");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+  });
 
   const queryParams = useMemo(() => {
-    const p: Record<string, string> = { period };
+    const p: Record<string, any> = {
+      period,
+      page: pagination.page,
+      limit: pagination.limit,
+    };
     if (period === "custom" && startDate && endDate) {
       p.startDate = new Date(startDate).toISOString();
       p.endDate = new Date(endDate).toISOString();
     }
     return p;
-  }, [period, startDate, endDate]);
+  }, [period, startDate, endDate, pagination.page, pagination.limit]);
 
-  const { data, isLoading } = useQuery({
+  const { data: resData, isLoading } = useQuery({
     queryKey: ["workersSalary", queryParams],
     queryFn: async () => {
-      const res = await api.default.get("/auth/users/salary-summary", {
-        params: queryParams,
-      });
-      return res.data.data as SalaryData;
+      const res = await api.getAdminSalarySummary(queryParams);
+      return res.data as SalaryResponse;
     },
   });
+
+  const data = resData?.meta;
+  const workers = resData?.data || [];
+  const paginationInfo = resData?.pagination;
 
   const statCards = data
     ? [
@@ -357,7 +377,7 @@ export default function AdminSalarySummaryPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.workers.map((w) => (
+                    {workers.map((w) => (
                       <tr
                         key={w.user._id}
                         className="border-b border-slate-100 hover:bg-slate-50"
@@ -417,8 +437,25 @@ export default function AdminSalarySummaryPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="px-4 py-3 text-sm text-slate-500 border-t">
-                Tổng {data.workers.length} công nhân
+              <div className="px-4 py-3 flex items-center justify-between border-t">
+                <div className="text-sm text-slate-500">
+                  Hiển thị {workers.length} / {paginationInfo?.total || 0} công
+                  nhân
+                </div>
+                {paginationInfo && (
+                  <Pagination
+                    page={paginationInfo.page}
+                    totalPages={paginationInfo.totalPages}
+                    limit={paginationInfo.limit}
+                    total={paginationInfo.total}
+                    onPageChange={(p) =>
+                      setPagination((prev) => ({ ...prev, page: p }))
+                    }
+                    onLimitChange={(l) =>
+                      setPagination((prev) => ({ ...prev, limit: l, page: 1 }))
+                    }
+                  />
+                )}
               </div>
             </CardContent>
           </Card>
