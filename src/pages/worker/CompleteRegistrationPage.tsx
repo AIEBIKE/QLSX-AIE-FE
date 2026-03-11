@@ -31,6 +31,21 @@ export default function CompleteRegistrationPage() {
       const res = await api.getTodayRegistrations();
       const reg = res.data.data?.find((r: any) => r._id === id);
       if (reg) {
+        // If already completed, redirect back
+        if (reg.status === "completed") {
+          toast.info("Đăng ký này đã hoàn thành");
+          navigate("/worker");
+          return;
+        }
+        // If still registered, auto-start it
+        if (reg.status === "registered") {
+          try {
+            await api.startRegistration(id || "");
+            reg.status = "in_progress";
+          } catch (err: any) {
+            console.error("Auto-start failed:", err);
+          }
+        }
         setRegistration(reg);
         if (reg.actualQuantity !== null && reg.actualQuantity !== undefined) {
           setActualQuantity(reg.actualQuantity);
@@ -51,10 +66,10 @@ export default function CompleteRegistrationPage() {
     setSubmitting(true);
     try {
       await api.completeRegistration(id || "", {
-        quantity: actualQuantity,
+        actualQuantity: actualQuantity,
         interruptionNote: interruptionNote || "",
         interruptionMinutes: interruptionMinutes || 0,
-      } as any);
+      });
       toast.success("Đã lưu thành công!");
       navigate("/worker");
     } catch (err: any) {

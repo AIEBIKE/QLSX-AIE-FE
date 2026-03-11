@@ -141,6 +141,16 @@ export default function WorkerDashboard() {
     }
   };
 
+  const handleStartRegistration = async (regId: string) => {
+    try {
+      await api.startRegistration(regId);
+      toast.success("Đã bắt đầu thao tác!");
+      loadData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
+    }
+  };
+
   const isRegistered = (opId: string) =>
     todayRegistrations.some(
       (r) => r.operationId?._id === opId || r.operationId === opId,
@@ -265,16 +275,58 @@ export default function WorkerDashboard() {
                                 <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
                                   ✓ Hoàn thành
                                 </Badge>
-                              ) : (
+                              ) : reg.status === "in_progress" ? (
                                 <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">
                                   ⏱ Đang làm
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
+                                  📋 Đã đăng ký
                                 </Badge>
                               )}
                             </div>
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          {reg.status !== "completed" ? (
+                          {reg.status === "registered" ? (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => handleStartRegistration(reg._id)}
+                                className="bg-emerald-500 hover:bg-emerald-600"
+                              >
+                                <Play className="w-3.5 h-3.5 mr-1" /> Bắt đầu
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button size="sm" variant="destructive">
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      Hủy đăng ký?
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Hủy đăng ký thao tác này?
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Không</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() =>
+                                        handleCancelRegistration(reg._id)
+                                      }
+                                      className="bg-red-500 hover:bg-red-600"
+                                    >
+                                      Hủy đăng ký
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </>
+                          ) : reg.status === "in_progress" ? (
                             <>
                               <Button
                                 size="sm"
@@ -283,7 +335,7 @@ export default function WorkerDashboard() {
                                 }
                                 className="bg-[#0077c0] hover:bg-[#005f9e]"
                               >
-                                <Play className="w-3.5 h-3.5 mr-1" /> Nhập kết
+                                <CheckCircle className="w-3.5 h-3.5 mr-1" /> Nhập kết
                                 quả
                               </Button>
                               <AlertDialog>

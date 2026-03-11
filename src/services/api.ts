@@ -195,9 +195,13 @@ export const registerOperation = (
   operationId: string,
 ): Promise<AxiosResponse<ApiResponse<Registration>>> =>
   api.post("/registrations", { operationId });
+export const startRegistration = (
+  id: string,
+): Promise<AxiosResponse<ApiResponse<Registration>>> =>
+  api.put(`/registrations/${id}/start`);
 export const completeRegistration = (
   id: string,
-  data: { quantity: number; notes?: string },
+  data: { actualQuantity: number; interruptionNote?: string; interruptionMinutes?: number },
 ): Promise<AxiosResponse<ApiResponse<Registration>>> =>
   api.put(`/registrations/${id}/complete`, data);
 export const cancelRegistration = (
