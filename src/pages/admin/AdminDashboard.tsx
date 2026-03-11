@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   Car,
   FileText,
@@ -16,20 +17,9 @@ import * as api from "../../services/api";
 export default function AdminDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [stats, setStats] = useState({
-    vehicleTypes: 0,
-    activeOrder: null as any,
-    todayRegistrations: 0,
-    completedRegistrations: 0,
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadStats();
-  }, []);
-
-  const loadStats = async () => {
-    try {
+  const { data: stats, isLoading: loading } = useQuery({
+    queryKey: ["dashboardStats"],
+    queryFn: async () => {
       const [vehicleTypesRes, activeOrderRes, registrationsRes] =
         await Promise.all([
           api.getVehicleTypes({ active: true }),
@@ -44,7 +34,7 @@ export default function AdminDashboard() {
         (r: any) => r.status === "completed",
       ).length;
 
-      setStats({
+      return {
         vehicleTypes: (vehicleTypesRes.data as any).pagination?.total || 0,
         activeOrder: activeOrderRes.data.data,
         todayRegistrations:
@@ -52,13 +42,10 @@ export default function AdminDashboard() {
           (registrationsRes.data as any).pagination?.total ||
           0,
         completedRegistrations: completed,
-      });
-    } catch (error) {
-      console.error("Error loading stats:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      };
+    },
+    staleTime: 30_000,
+  });
 
   if (loading) {
     return (
@@ -67,6 +54,8 @@ export default function AdminDashboard() {
       </div>
     );
   }
+
+  if (!stats) return null;
 
   const statCards = [
     {
@@ -151,7 +140,9 @@ export default function AdminDashboard() {
               <div>
                 <p className="text-sm text-slate-500">Loại xe</p>
                 <p className="text-xl font-bold text-slate-800">
-                  {stats.activeOrder.vehicleTypeId?.name}
+                  {typeof stats.activeOrder.vehicleTypeId === "object"
+                    ? stats.activeOrder.vehicleTypeId.name
+                    : stats.activeOrder.vehicleTypeId}
                 </p>
               </div>
               <div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { Pagination } from "@/components/shared/Pagination";
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
@@ -33,7 +33,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import * as api from "../../services/api";
+import { useVehicleTypes } from "@/hooks/useQueries";
+import { useCreateVehicleType, useUpdateVehicleType, useDeleteVehicleType } from "@/hooks/useMutations";
 import { useAuth } from "../../contexts/AuthContext";
 
 export default function VehicleTypesPage() {
@@ -41,20 +42,12 @@ export default function VehicleTypesPage() {
   const roleCode = user?.roleCode || user?.role;
   const isAdmin = roleCode === "ADMIN" || roleCode === "admin";
 
-  const [vehicleTypes, setVehicleTypes] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-
-  // Pagination state
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 1,
-  });
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
   const [formData, setFormData] = useState({
     name: "",
@@ -63,57 +56,54 @@ export default function VehicleTypesPage() {
     enginePrefix: "",
   });
 
+  const vtParams = useMemo(() => ({
+    page,
+    limit,
+    search: searchTerm || undefined,
+  }), [page, limit, searchTerm]);
+
+  const { data: vtData, isLoading: loading } = useVehicleTypes(vtParams);
+  const vehicleTypes = vtData?.data || [];
+  const pagination = {
+    page,
+    limit,
+    total: vtData?.pagination?.total || 0,
+    totalPages: vtData?.pagination?.totalPages || 1,
+  };
+
+  const createMutation = useCreateVehicleType();
+  const updateMutation = useUpdateVehicleType();
+
   useEffect(() => {
-    loadVehicleTypes();
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
-  }, [pagination.page, pagination.limit]);
-
-  const loadVehicleTypes = async () => {
-    setLoading(true);
-    try {
-      const res = await api.getVehicleTypes({
-        page: pagination.page,
-        limit: pagination.limit,
-        search: searchTerm || undefined,
-      });
-      setVehicleTypes(res.data.data || []);
-      if (res.data.pagination) {
-        setPagination((prev) => ({
-          ...prev,
-          total: res.data.pagination.total,
-          totalPages: res.data.pagination.totalPages,
-        }));
-      }
-    } catch {
-      toast.error("Lỗi tải dữ liệu");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setPagination((prev) => ({ ...prev, page: 1 }));
-    loadVehicleTypes();
+    setPage(1);
   };
 
-  const handleSubmit = async () => {
-    try {
-      if (editingId) {
-        await api.updateVehicleType(editingId, formData);
-        toast.success("Cập nhật thành công");
-      } else {
-        await api.createVehicleType(formData);
-        toast.success("Thêm thành công");
-      }
-      setModalOpen(false);
-      resetForm();
-      loadVehicleTypes();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
+  const handleSubmit = () => {
+    if (editingId) {
+      updateMutation.mutate(
+        { id: editingId, data: formData },
+        {
+          onSuccess: () => {
+            setModalOpen(false);
+            resetForm();
+          },
+        },
+      );
+    } else {
+      createMutation.mutate(formData, {
+        onSuccess: () => {
+          setModalOpen(false);
+          resetForm();
+        },
+      });
     }
   };
 
@@ -128,14 +118,10 @@ export default function VehicleTypesPage() {
     setModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      await api.deleteVehicleType(id);
-      toast.success("Xóa thành công");
-      loadVehicleTypes();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
-    }
+  const deleteMutation = useDeleteVehicleType();
+
+  const handleDelete = (id: string) => {
+    deleteMutation.mutate(id);
   };
 
   const resetForm = () => {
@@ -351,12 +337,8 @@ export default function VehicleTypesPage() {
             totalPages={pagination.totalPages}
             limit={pagination.limit}
             total={pagination.total}
-            onPageChange={(p: number) =>
-              setPagination((prev) => ({ ...prev, page: p }))
-            }
-            onLimitChange={(l: number) =>
-              setPagination((prev) => ({ ...prev, limit: l, page: 1 }))
-            }
+            onPageChange={(p: number) => setPage(p)}
+            onLimitChange={() => setPage(1)}
           />
         </>
       )}

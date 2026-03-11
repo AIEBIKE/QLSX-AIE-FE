@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Cookies from "js-cookie";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Plus,
@@ -74,6 +74,11 @@ import {
 
 import * as api from "../../services/api";
 import { getNextCodeApi } from "@/services/authService";
+import {
+  useCreateUser,
+  useUpdateUser,
+  useDeleteUser,
+} from "@/hooks/useMutations";
 
 // ─── Helpers ─────────────────────────────────────────
 const getAvatarColor = (name: string) => {
@@ -153,14 +158,10 @@ export default function UsersManagementPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const [users, setUsers] = useState<UserType[]>([]);
-  const [pendingUsers, setPendingUsers] = useState<UserType[]>([]);
-  const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
-  const [factories, setFactories] = useState<any[]>([]);
   const [selectedFactory, setSelectedFactory] = useState<string>("all");
 
   const currentUser = JSON.parse(Cookies.get("user") || "{}");
@@ -168,17 +169,13 @@ export default function UsersManagementPage() {
   const isAdmin = roleCode === "ADMIN" || roleCode === "admin";
   const isFacManager = roleCode === "FAC_MANAGER" || roleCode === "fac_manager";
 
-  useEffect(() => {
-    const loadFactories = async () => {
-      try {
-        const res = await api.getFactories();
-        setFactories(res.data.data || []);
-      } catch (err) {
-        console.error("Error loading factories:", err);
-      }
-    };
-    loadFactories();
-  }, []);
+  const { data: factories = [] } = useQuery({
+    queryKey: ["factories"],
+    queryFn: async () => {
+      const res = await api.getFactories();
+      return res.data.data || [];
+    },
+  });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -213,7 +210,6 @@ export default function UsersManagementPage() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Pagination state
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -222,9 +218,17 @@ export default function UsersManagementPage() {
     meta: { total: 0, active: 0, inactive: 0 },
   });
 
-  const loadUsers = async () => {
-    try {
-      setLoading(true);
+  const { data: usersData, isLoading: loadingUsers } = useQuery({
+    queryKey: [
+      "users",
+      selectedFactory,
+      filterRole,
+      filterStatus,
+      pagination.page,
+      pagination.limit,
+      searchText,
+    ],
+    queryFn: async () => {
       const res = await api.getUsers({
         factoryId: selectedFactory !== "all" ? selectedFactory : undefined,
         role: filterRole !== "all" ? filterRole : undefined,
@@ -238,53 +242,34 @@ export default function UsersManagementPage() {
         page: pagination.page,
         limit: pagination.limit,
       });
-      setUsers(res.data.data || []);
-      if (res.data.pagination) {
-        setPagination((prev) => ({
-          ...prev,
-          total: res.data.pagination.total,
-          totalPages: res.data.pagination.totalPages,
-          meta: res.data.meta || { total: 0, active: 0, inactive: 0 },
-        }));
-      }
-    } catch (error: any) {
-      toast.error("Lỗi tải danh sách: " + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return res.data;
+    },
+  });
 
-  const loadPendingUsers = async () => {
-    try {
+  const users = usersData?.data || [];
+  useEffect(() => {
+    if (usersData?.pagination) {
+      setPagination((prev) => ({
+        ...prev,
+        total: usersData.pagination.total,
+        totalPages: usersData.pagination.totalPages,
+        meta: usersData.meta || { total: 0, active: 0, inactive: 0 },
+      }));
+    }
+  }, [usersData]);
+
+  const { data: pendingUsersData, isLoading: loadingPending } = useQuery({
+    queryKey: ["pendingUsers"],
+    queryFn: async () => {
       const res = await api.default.get("/auth/users/pending");
-      setPendingUsers(res.data.data || []);
-    } catch (error) {
-      console.error("Error loading pending users:", error);
-    }
-  };
+      return (res.data.data || []) as UserType[];
+    },
+    enabled: !isFacManager,
+  });
 
-  useEffect(() => {
-    loadUsers();
-    loadPendingUsers();
-  }, [
-    selectedFactory,
-    filterRole,
-    filterStatus,
-    pagination.page,
-    pagination.limit,
-  ]);
+  const pendingUsers = pendingUsersData || [];
 
-  // Handle Search with debounce or simple button?
-  // User can click a search button or we can debounce.
-  // The current UI has the search input. Let's make it trigger loadUsers on Enter or button.
-  // Actually, let's keep it simple: re-fetch when searchText changes (debounced would be better but let's see).
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setPagination((prev) => ({ ...prev, page: 1 }));
-      loadUsers();
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [searchText]);
+  const loading = loadingUsers || loadingPending;
 
   // Fetch next employee code based on role
   const fetchNextCode = useCallback(async (role: string) => {
@@ -298,77 +283,86 @@ export default function UsersManagementPage() {
     }
   }, []);
 
-  // Handle approve user
-  const handleApprove = async (userId: string) => {
-    try {
-      await api.default.put(`/auth/users/${userId}/approve`);
+  const approveMutation = useMutation({
+    mutationFn: (userId: string) =>
+      api.default.put(`/auth/users/${userId}/approve`),
+    onSuccess: () => {
       toast.success("Đã duyệt tài khoản!");
-      loadPendingUsers();
-      loadUsers();
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["pendingUsers"] });
       queryClient.invalidateQueries({ queryKey: ["pendingUsersCount"] });
-    } catch (error: any) {
+    },
+    onError: (error: any) => {
       toast.error(
         "Lỗi: " + (error.response?.data?.error?.message || error.message),
       );
-    }
-  };
+    },
+  });
 
-  // Handle reject user
-  const handleReject = async (userId: string) => {
-    try {
-      await api.default.put(`/auth/users/${userId}/reject`);
+  const rejectMutation = useMutation({
+    mutationFn: (userId: string) =>
+      api.default.put(`/auth/users/${userId}/reject`),
+    onSuccess: () => {
       toast.success("Đã từ chối tài khoản!");
-      loadPendingUsers();
-      loadUsers();
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["pendingUsers"] });
       queryClient.invalidateQueries({ queryKey: ["pendingUsersCount"] });
-    } catch (error: any) {
+    },
+    onError: (error: any) => {
       toast.error(
         "Lỗi: " + (error.response?.data?.error?.message || error.message),
       );
-    }
+    },
+  });
+
+  const createUserMut = useCreateUser();
+  const updateUserMut = useUpdateUser();
+  const deleteUserMut = useDeleteUser();
+
+  const handleApprove = (userId: string) => {
+    approveMutation.mutate(userId);
   };
 
-  const handleSubmit = async () => {
-    try {
-      const payload: any = {
-        name: formData.name,
-        code: formData.code,
-        role: formData.role,
-        factoryId: formData.factoryId || undefined,
-        dateOfBirth: formData.dateOfBirth || undefined,
-        citizenId: formData.citizenId || undefined,
-        address: formData.address || undefined,
-      };
-      if (editingUser) {
-        if (formData.password) payload.password = formData.password;
-        payload.active = formData.active;
-        await api.updateUser(editingUser._id, payload);
-        toast.success("Đã cập nhật người dùng!");
-      } else {
-        payload.password = formData.password;
-        await api.createUser(payload);
-        toast.success("Đã tạo người dùng mới!");
-      }
+  const handleReject = (userId: string) => {
+    rejectMutation.mutate(userId);
+  };
+
+  const handleSubmit = () => {
+    const payload: any = {
+      name: formData.name,
+      code: formData.code,
+      role: formData.role,
+      factoryId: formData.factoryId || undefined,
+      dateOfBirth: formData.dateOfBirth || undefined,
+      citizenId: formData.citizenId || undefined,
+      address: formData.address || undefined,
+    };
+    
+    const onSuccess = () => {
       setModalOpen(false);
       resetForm();
-      loadUsers();
-    } catch (error: any) {
-      toast.error(
-        "Lỗi: " + (error.response?.data?.error?.message || error.message),
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    };
+
+    if (editingUser) {
+      if (formData.password) payload.password = formData.password;
+      payload.active = formData.active;
+      updateUserMut.mutate(
+        { id: editingUser._id, data: payload },
+        { onSuccess },
       );
+    } else {
+      payload.password = formData.password;
+      createUserMut.mutate(payload, { onSuccess });
     }
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      await api.deleteUser(id);
-      toast.success("Đã xóa người dùng!");
-      loadUsers();
-    } catch (error: any) {
-      toast.error(
-        "Lỗi: " + (error.response?.data?.error?.message || error.message),
-      );
-    }
+  const handleDelete = (id: string) => {
+    deleteUserMut.mutate(id, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["users"] });
+      },
+    });
   };
 
   const resetForm = () => {
@@ -768,7 +762,7 @@ export default function UsersManagementPage() {
                                     {u.factoryId &&
                                       ` • 🏭 ${
                                         typeof u.factoryId === "object"
-                                          ? u.factoryId.name
+                                          ? (u.factoryId as any).name
                                           : factories.find(
                                               (f) => f._id === u.factoryId,
                                             )?.name || u.factoryId
@@ -923,7 +917,7 @@ export default function UsersManagementPage() {
                                 <div className="text-xs text-slate-400 flex items-center gap-1 mt-1">
                                   <span>🏭</span>{" "}
                                   {typeof u.factoryId === "object"
-                                    ? u.factoryId.name
+                                    ? (u.factoryId as any).name
                                     : factories.find(
                                         (f) => f._id === u.factoryId,
                                       )?.name || u.factoryId}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Factory,
   Plus,
@@ -32,7 +32,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import * as api from "../../services/api";
+import { useFactories } from "@/hooks/useQueries";
+import { useCreateFactory, useUpdateFactory, useDeleteFactory } from "@/hooks/useMutations";
 import { useAuth } from "../../contexts/AuthContext";
 
 export default function FactoryManagementPage() {
@@ -40,8 +41,9 @@ export default function FactoryManagementPage() {
   const roleCode = user?.roleCode || user?.role;
   const isAdmin = roleCode === "ADMIN" || roleCode === "admin";
 
-  const [factories, setFactories] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [factories_raw] = [[] as any[]];
+  const { data: factoriesData, isLoading: loading } = useFactories(true);
+  const factories = factoriesData || [];
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingFactory, setEditingFactory] = useState<any>(null);
   const [formData, setFormData] = useState({
@@ -49,23 +51,10 @@ export default function FactoryManagementPage() {
     code: "",
     location: "",
   });
-  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    loadFactories();
-  }, []);
-
-  const loadFactories = async () => {
-    setLoading(true);
-    try {
-      const res = await api.getFactories();
-      setFactories(res.data.data);
-    } catch (err) {
-      toast.error("Không thể tải danh sách nhà máy");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const createMutation = useCreateFactory();
+  const updateMutation = useUpdateFactory();
+  const deleteMutation = useDeleteFactory();
 
   const handleOpenDialog = (factory?: any) => {
     if (factory) {
@@ -88,36 +77,21 @@ export default function FactoryManagementPage() {
       toast.error("Vui lòng nhập tên và mã nhà máy");
       return;
     }
-
-    setSaving(true);
-    try {
-      if (editingFactory) {
-        await api.updateFactory(editingFactory._id, formData);
-        toast.success("Cập nhật thành công!");
-      } else {
-        await api.createFactory(formData);
-        toast.success("Thêm nhà máy mới thành công!");
-      }
-      setIsDialogOpen(false);
-      loadFactories();
-    } catch (err: any) {
-      toast.error(
-        err.response?.data?.error?.message || "Lỗi khi lưu thông tin",
+    if (editingFactory) {
+      updateMutation.mutate(
+        { id: editingFactory._id, data: formData },
+        { onSuccess: () => setIsDialogOpen(false) },
       );
-    } finally {
-      setSaving(false);
+    } else {
+      createMutation.mutate(formData, {
+        onSuccess: () => setIsDialogOpen(false),
+      });
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!window.confirm("Bạn có chắc chắn muốn xóa nhà máy này?")) return;
-    try {
-      await api.deleteFactory(id);
-      toast.success("Đã xóa nhà máy");
-      loadFactories();
-    } catch (err) {
-      toast.error("Không thể xóa nhà máy");
-    }
+    deleteMutation.mutate(id);
   };
 
   return (
@@ -259,10 +233,10 @@ export default function FactoryManagementPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={saving}
+                disabled={createMutation.isPending || updateMutation.isPending}
                 className="bg-[#0077c0] hover:bg-[#005f9e]"
               >
-                {saving ? (
+                {(createMutation.isPending || updateMutation.isPending) ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : null}
                 {editingFactory ? "Cập nhật" : "Thêm mới"}

@@ -49,20 +49,25 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as api from "../../services/api";
 import { useAuth } from "../../contexts/AuthContext";
+import {
+  useCreateProcess,
+  useUpdateProcess,
+  useDeleteProcess,
+  useCreateOperation,
+  useUpdateOperation,
+  useDeleteOperation,
+} from "@/hooks/useMutations";
 
 export default function ProcessManagementPage() {
   const { user } = useAuth();
   const roleCode = user?.roleCode || user?.role;
   const isAdmin = roleCode === "ADMIN" || roleCode === "admin";
 
-  const [vehicleTypes, setVehicleTypes] = useState<any[]>([]);
   const [selectedVehicleType, setSelectedVehicleType] = useState<any>(null);
-  const [processes, setProcesses] = useState<any[]>([]);
-  const [operations, setOperations] = useState<any[]>([]);
   const [selectedProcess, setSelectedProcess] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
 
   // Modal states
   const [processModalOpen, setProcessModalOpen] = useState(false);
@@ -89,132 +94,142 @@ export default function ProcessManagementPage() {
     instructions: "",
   });
 
-  useEffect(() => {
-    loadVehicleTypes();
-  }, []);
-  useEffect(() => {
-    if (selectedVehicleType) {
-      loadProcesses();
-      setSelectedProcess(null);
-      setOperations([]);
-    }
-  }, [selectedVehicleType]);
-  useEffect(() => {
-    if (selectedProcess) {
-      loadOperations();
-    }
-  }, [selectedProcess]);
+  const queryClient = useQueryClient();
 
-  const loadVehicleTypes = async () => {
-    try {
+  // ─── Query: Vehicle Types ──────────────────────────
+  const { data: vehicleTypes = [], isLoading: loading } = useQuery({
+    queryKey: ["processPage_vehicleTypes"],
+    queryFn: async () => {
       const res = await api.getVehicleTypes({ active: true });
-      const types = res.data.data || [];
-      setVehicleTypes(types);
-      if (types.length > 0) setSelectedVehicleType(types[0]);
-    } catch {
-      toast.error("Lỗi tải loại xe");
-    } finally {
-      setLoading(false);
-    }
-  };
+      return res.data.data || [];
+    },
+  });
 
-  const loadProcesses = async () => {
-    try {
+  // Auto-select first vehicle type
+  useEffect(() => {
+    if (vehicleTypes.length > 0 && !selectedVehicleType) {
+      setSelectedVehicleType(vehicleTypes[0]);
+    }
+  }, [vehicleTypes]);
+
+  // ─── Query: Processes (cascading) ──────────────────
+  const { data: processes = [] } = useQuery({
+    queryKey: ["processPage_processes", selectedVehicleType?._id],
+    queryFn: async () => {
       const res = await api.getProcesses({
         vehicleTypeId: selectedVehicleType._id,
       });
-      const procs = res.data.data || [];
-      setProcesses(procs);
-      if (procs.length > 0 && !selectedProcess) setSelectedProcess(procs[0]);
-    } catch {
-      toast.error("Lỗi tải công đoạn");
-    }
-  };
+      return res.data.data || [];
+    },
+    enabled: !!selectedVehicleType,
+  });
 
-  const loadOperations = async () => {
-    try {
-      const res = await api.getOperations({ processId: selectedProcess._id });
-      setOperations(res.data.data || []);
-    } catch {
-      toast.error("Lỗi tải thao tác");
+  // Auto-select first process when processes change
+  useEffect(() => {
+    if (processes.length > 0 && !selectedProcess) {
+      setSelectedProcess(processes[0]);
     }
-  };
+  }, [processes]);
+
+  // Reset process selection when vehicle type changes
+  useEffect(() => {
+    setSelectedProcess(null);
+  }, [selectedVehicleType]);
+
+  // ─── Query: Operations (cascading) ─────────────────
+  const { data: operations = [] } = useQuery({
+    queryKey: ["processPage_operations", selectedProcess?._id],
+    queryFn: async () => {
+      const res = await api.getOperations({ processId: selectedProcess._id });
+      return res.data.data || [];
+    },
+    enabled: !!selectedProcess,
+  });
+
+  // ─── Mutations ─────────────────────────────────────
+  const createProcessMut = useCreateProcess();
+  const updateProcessMut = useUpdateProcess();
+  const deleteProcessMut = useDeleteProcess();
+  const createOperationMut = useCreateOperation();
+  const updateOperationMut = useUpdateOperation();
+  const deleteOperationMut = useDeleteOperation();
 
   // Process CRUD
-  const handleProcessSubmit = async () => {
-    try {
-      const data = {
-        ...processForm,
-        order: Number(processForm.order),
-        vehicleTypeId: selectedVehicleType._id,
-      };
-      if (editingProcess) {
-        await api.updateProcess(editingProcess._id, data);
-        toast.success("Cập nhật công đoạn thành công");
-      } else {
-        await api.createProcess(data);
-        toast.success("Thêm công đoạn thành công");
-      }
+  const handleProcessSubmit = () => {
+    const data = {
+      ...processForm,
+      order: Number(processForm.order),
+      vehicleTypeId: selectedVehicleType._id,
+    };
+    const onSuccess = () => {
       setProcessModalOpen(false);
       setEditingProcess(null);
-      loadProcesses();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
+      queryClient.invalidateQueries({
+        queryKey: ["processPage_processes", selectedVehicleType?._id],
+      });
+    };
+    if (editingProcess) {
+      updateProcessMut.mutate(
+        { id: editingProcess._id, data },
+        { onSuccess },
+      );
+    } else {
+      createProcessMut.mutate(data, { onSuccess });
     }
   };
 
-  const handleDeleteProcess = async (id: string) => {
-    try {
-      await api.deleteProcess(id);
-      toast.success("Xóa công đoạn thành công");
-      loadProcesses();
-      if (selectedProcess?._id === id) {
-        setSelectedProcess(null);
-        setOperations([]);
-      }
-    } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
-    }
+  const handleDeleteProcess = (id: string) => {
+    deleteProcessMut.mutate(id, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({
+          queryKey: ["processPage_processes", selectedVehicleType?._id],
+        });
+        if (selectedProcess?._id === id) {
+          setSelectedProcess(null);
+        }
+      },
+    });
   };
 
   // Operation CRUD
-  const handleOperationSubmit = async () => {
-    try {
-      const data = {
-        ...opForm,
-        difficulty: Number(opForm.difficulty),
-        maxWorkers: Number(opForm.maxWorkers),
-        standardQuantity: opForm.standardQuantity
-          ? Number(opForm.standardQuantity)
-          : undefined,
-        standardMinutes: opForm.standardMinutes
-          ? Number(opForm.standardMinutes)
-          : undefined,
-        processId: selectedProcess._id,
-      };
-      if (editingOperation) {
-        await api.updateOperation(editingOperation._id, data);
-        toast.success("Cập nhật thao tác thành công");
-      } else {
-        await api.createOperation(data);
-        toast.success("Thêm thao tác thành công");
-      }
+  const handleOperationSubmit = () => {
+    const data = {
+      ...opForm,
+      difficulty: Number(opForm.difficulty),
+      maxWorkers: Number(opForm.maxWorkers),
+      standardQuantity: opForm.standardQuantity
+        ? Number(opForm.standardQuantity)
+        : undefined,
+      standardMinutes: opForm.standardMinutes
+        ? Number(opForm.standardMinutes)
+        : undefined,
+      processId: selectedProcess._id,
+    };
+    const onSuccess = () => {
       setOperationModalOpen(false);
       setEditingOperation(null);
-      loadOperations();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
+      queryClient.invalidateQueries({
+        queryKey: ["processPage_operations", selectedProcess?._id],
+      });
+    };
+    if (editingOperation) {
+      updateOperationMut.mutate(
+        { id: editingOperation._id, data },
+        { onSuccess },
+      );
+    } else {
+      createOperationMut.mutate(data, { onSuccess });
     }
   };
 
-  const handleDeleteOperation = async (id: string) => {
-    try {
-      await api.deleteOperation(id);
-      toast.success("Xóa thao tác thành công");
-      loadOperations();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
-    }
+  const handleDeleteOperation = (id: string) => {
+    deleteOperationMut.mutate(id, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({
+          queryKey: ["processPage_operations", selectedProcess?._id],
+        });
+      },
+    });
   };
 
   const openProcessModal = (process: any = null) => {
@@ -548,7 +563,7 @@ export default function ProcessManagementPage() {
                               </Badge>
                             </td>
                             <td className="py-3 text-center">
-                              <DifficultyStars value={op.difficulty || 3} />
+                              <DifficultyStars value={Number(op.difficulty) || 3} />
                             </td>
                             {isAdmin && (
                               <td className="py-3">

@@ -30,6 +30,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../contexts/AuthContext";
 import * as api from "../../services/api";
 
@@ -67,11 +68,27 @@ const getIconColorClass = (processName = "") => {
 export default function WorkerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [activeOrder, setActiveOrder] = useState<any>(null);
-  const [operations, setOperations] = useState<any[]>([]);
-  const [processes, setProcesses] = useState<any[]>([]);
-  const [todayRegistrations, setTodayRegistrations] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  const { data: dashboardData, isLoading: loading } = useQuery({
+    queryKey: ["workerDashboard"],
+    queryFn: async () => {
+      const [orderRes, regRes] = await Promise.all([
+        api.getCurrentOrderWithOperations(),
+        api.getTodayRegistrations(),
+      ]);
+      return {
+        orderData: orderRes.data.data as any,
+        registrations: regRes.data.data || [],
+      };
+    },
+    staleTime: 15_000,
+  });
+
+  const activeOrder = dashboardData?.orderData?.order || null;
+  const processes = dashboardData?.orderData?.processes || [];
+  const operations = dashboardData?.orderData?.operations || [];
+  const todayRegistrations = dashboardData?.registrations || [];
   const [registering, setRegistering] = useState(false);
   const [selectedProcess, setSelectedProcess] = useState("all");
   const [isOutOfTime, setIsOutOfTime] = useState(false);
@@ -93,37 +110,13 @@ export default function WorkerDashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    try {
-      const [orderRes, regRes] = await Promise.all([
-        api.getCurrentOrderWithOperations(),
-        api.getTodayRegistrations(),
-      ]);
-      const data = orderRes.data.data as any;
-      if (data) {
-        setActiveOrder(data.order);
-        setProcesses(data.processes || []);
-        setOperations(data.operations || []);
-      }
-      setTodayRegistrations(regRes.data.data || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleRegister = async (operationId: string) => {
     if (registering) return;
     setRegistering(true);
     try {
       await api.registerOperation(operationId);
       toast.success("Đăng ký thành công!");
-      loadData();
+      queryClient.invalidateQueries({ queryKey: ["workerDashboard"] });
     } catch (err: any) {
       toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
     } finally {
@@ -135,7 +128,7 @@ export default function WorkerDashboard() {
     try {
       await api.cancelRegistration(regId);
       toast.success("Đã hủy đăng ký");
-      loadData();
+      queryClient.invalidateQueries({ queryKey: ["workerDashboard"] });
     } catch (err: any) {
       toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
     }
@@ -143,11 +136,11 @@ export default function WorkerDashboard() {
 
   const isRegistered = (opId: string) =>
     todayRegistrations.some(
-      (r) => r.operationId?._id === opId || r.operationId === opId,
+      (r: any) => r.operationId?._id === opId || r.operationId === opId,
     );
 
   const filteredOperations = operations.filter(
-    (op) => selectedProcess === "all" || op.processId?._id === selectedProcess,
+    (op: any) => selectedProcess === "all" || op.processId?._id === selectedProcess,
   );
 
   if (loading)
