@@ -562,7 +562,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                                     className="w-full text-left px-3 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors flex items-center gap-2 border-b border-slate-100"
                                     onClick={() => {
                                       setNotifOpen(false);
-                                      navigate(`/admin/orders/${orderId}`);
+                                      navigate(`/admin/production-orders/${orderId}`);
                                     }}
                                   >
                                     <FileText className="w-4 h-4 text-[#0077c0]" />
@@ -592,7 +592,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                                         className="px-3 py-2 hover:bg-orange-50/50 cursor-pointer transition-colors"
                                         onClick={() => {
                                           setNotifOpen(false);
-                                          navigate(`/admin/orders/${orderId}`);
+                                          navigate(`/admin/production-orders/${orderId}`);
                                         }}
                                       >
                                         <div className="flex items-center justify-between">

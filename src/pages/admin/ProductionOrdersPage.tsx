@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Maximize2, Trash2, Eye, Loader2 } from "lucide-react";
+import { Plus, Search, Maximize2, Trash2, Eye, Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -53,6 +53,14 @@ import dayjs from "dayjs";
 import { Pagination } from "@/components/shared/Pagination";
 
 const statusMap: Record<string, { label: string; className: string }> = {
+  pending: {
+    label: "Chờ bắt đầu",
+    className: "bg-slate-100 text-slate-700 border-slate-200",
+  },
+  in_progress: {
+    label: "Đang sản xuất",
+    className: "bg-blue-100 text-blue-700 border-blue-200",
+  },
   active: {
     label: "Đang sản xuất",
     className: "bg-blue-100 text-blue-700 border-blue-200",
@@ -171,6 +179,16 @@ export default function ProductionOrdersPage() {
 
   const handleDelete = (id: string) => {
     deleteMutation.mutate(id);
+  };
+
+  const handleStartOrder = async (id: string) => {
+    try {
+      await api.updateProductionOrderStatus(id, "in_progress");
+      toast.success("Đã bắt đầu lệnh sản xuất!");
+      loadData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
+    }
   };
 
   const resetForm = () => {
@@ -408,6 +426,22 @@ export default function ProductionOrdersPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {canEdit && order.status === "pending" && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-emerald-600 hover:bg-emerald-50"
+                                      onClick={() => handleStartOrder(order._id)}
+                                    >
+                                      <Play className="w-4 h-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Bắt đầu sản xuất</TooltipContent>
+                                </Tooltip>
+                              )}
+
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button

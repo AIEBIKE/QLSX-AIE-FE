@@ -848,12 +848,58 @@ export default function ProductionOrderDetailPage() {
               </tbody>
             </table>
           </div>
-          {(order as any)?.status === "in_progress" && (
+          {canEdit && order?.status !== "completed" && (
             <div className="flex gap-3 mt-5 pt-5 border-t">
               <Button variant="outline" onClick={refreshAll}>
                 <RefreshCw className="w-4 h-4 mr-1" /> Làm mới
               </Button>
-              {canEdit && (
+
+              {/* Nút Bắt đầu - chuyển pending → in_progress */}
+              {order?.status === "pending" && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button className="bg-[#0077c0] hover:bg-[#005fa3]">
+                      <Zap className="w-4 h-4 mr-1" /> Bắt đầu
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        Bắt đầu lệnh sản xuất?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Lệnh sẽ chuyển sang trạng thái "Đang thực hiện". Công
+                        nhân có thể đăng ký thao tác.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Hủy</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-[#0077c0]"
+                        onClick={async () => {
+                          try {
+                            await api.updateProductionOrderStatus(
+                              id!,
+                              "in_progress",
+                            );
+                            toast.success("Đã bắt đầu lệnh sản xuất!");
+                            loadData();
+                          } catch (e: any) {
+                            toast.error(
+                              e.response?.data?.error?.message || e.message,
+                            );
+                          }
+                        }}
+                      >
+                        Bắt đầu
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+
+              {/* Nút Hoàn thành - khi đang in_progress */}
+              {order?.status === "in_progress" && (
                 <>
                   <Button variant="outline" onClick={handleCheckCompletion}>
                     <AlertTriangle className="w-4 h-4 mr-1" /> Kiểm tra
