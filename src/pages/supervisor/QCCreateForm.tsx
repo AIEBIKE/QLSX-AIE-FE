@@ -125,11 +125,18 @@ export default function QCCreateForm({ onSuccess }: QCCreateFormProps) {
   const handleNoteChange = (opId: string, note: string) =>
     setResults((prev) => ({ ...prev, [opId]: { ...prev[opId], note } }));
 
+  const [frameError, setFrameError] = useState(false);
+  const [engineError, setEngineError] = useState(false);
+
   const inspectMutation = apiHooks.useInspectVehicle(); // [splinh-12/03-14:34]
 
   const handleSubmit = () => {
     if (!frameNumber) { toast.error("Vui lòng nhập số khung"); return; }
     if (!activeOrderId) { toast.error("Không có lệnh sản xuất đang hoạt động"); return; }
+
+    // Reset lỗi trước khi submit
+    setFrameError(false);
+    setEngineError(false);
 
     inspectMutation.mutate({
       productionOrderId: activeOrderId,
@@ -156,13 +163,30 @@ export default function QCCreateForm({ onSuccess }: QCCreateFormProps) {
         setFrameNumber(framePrefix ? `${framePrefix}-${String(nextIndex).padStart(3, "0")}` : "");
         setEngineNumber(enginePrefix ? `${enginePrefix}-${String(nextIndex).padStart(3, "0")}` : "");
         setColor("");
+        setFrameError(false);
+        setEngineError(false);
 
         const reset: any = {};
         operations.forEach((op: any) => { reset[op._id] = { status: "pass", note: "" }; });
         setResults(reset);
 
         onSuccess?.();
-      }
+      },
+      onError: (err: any) => {
+        const errData = err?.response?.data?.error;
+        const msg = errData?.message || err?.message || "Đã xảy ra lỗi khi lưu phiếu";
+        const code = errData?.code || "";
+
+        if (code === "DUPLICATE_FRAME_NUMBER") {
+          setFrameError(true);
+          toast.error(msg, { description: "Vui lòng kiểm tra và nhập số khung khác" });
+        } else if (code === "DUPLICATE_ENGINE_NUMBER") {
+          setEngineError(true);
+          toast.error(msg, { description: "Vui lòng kiểm tra và nhập số động cơ khác" });
+        } else {
+          toast.error(msg);
+        }
+      },
     });
   };
 
@@ -228,8 +252,8 @@ export default function QCCreateForm({ onSuccess }: QCCreateFormProps) {
             <Input
               placeholder="VD: XDD-001"
               value={frameNumber}
-              onChange={(e) => setFrameNumber(e.target.value)}
-              className="flex-1 text-xs"
+              onChange={(e) => { setFrameNumber(e.target.value); setFrameError(false); }}
+              className={`flex-1 text-xs ${frameError ? "border-red-500 focus-visible:ring-red-300" : ""}`}
             />
           </div>
         </div>
@@ -248,8 +272,8 @@ export default function QCCreateForm({ onSuccess }: QCCreateFormProps) {
             <Input
               placeholder="VD: DC-001"
               value={engineNumber}
-              onChange={(e) => setEngineNumber(e.target.value)}
-              className="flex-1 text-xs"
+              onChange={(e) => { setEngineNumber(e.target.value); setEngineError(false); }}
+              className={`flex-1 text-xs ${engineError ? "border-red-500 focus-visible:ring-red-300" : ""}`}
             />
           </div>
         </div>

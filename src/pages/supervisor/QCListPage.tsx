@@ -62,6 +62,7 @@ import { toast } from "sonner";
 import dayjs from "dayjs";
 import * as apiHooks from "../../hooks/useMutations"; // [splinh-12/03-14:28]
 import * as queryHooks from "../../hooks/useQueries"; // [splinh-12/03-14:28]
+import { Pagination } from "@/components/shared/Pagination";
 import QCCreateForm from "./QCCreateForm";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -84,6 +85,7 @@ export default function QCListPage() {
   const [filterOrderId, setFilterOrderId] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
 
   // Lấy danh sách nhà máy (chỉ cần cho admin)
   const { data: factories = [] } = queryHooks.useFactories(isAdmin); // [splinh-12/03-14:32]
@@ -106,7 +108,7 @@ export default function QCListPage() {
   const orders: any[] = ordersData?.data || [];
 
   // Query params cho danh sách QC
-  const queryParams: Record<string, unknown> = { page, limit: 20 };
+  const queryParams: Record<string, unknown> = { page, limit };
   if (filterDate) queryParams.date = filterDate;
   if (filterOrderId !== "all") queryParams.productionOrderId = filterOrderId;
   if (filterStatus !== "all") queryParams.status = filterStatus;
@@ -134,6 +136,7 @@ export default function QCListPage() {
     setFilterOrderId("all");
     setFilterStatus("all");
     setPage(1);
+    setLimit(10);
   };
 
   // Reset lệnh SX khi đổi nhà máy (admin)
@@ -374,12 +377,13 @@ export default function QCListPage() {
                   {qcList.map((qc: any, idx: number) => {
                     const order = typeof qc.productionOrderId === "object" ? qc.productionOrderId : null;
                     const inspector = typeof qc.inspectorId === "object" ? qc.inspectorId : null;
+                    const inspectorName = (inspector as any)?.profileId?.name || (inspector as any)?.name || "—";
                     const failCount = qc.results?.filter((r: any) => r.status === "fail").length;
                     const isPending = qc.status === "pending";
                     return (
                       <TableRow key={qc._id} className="hover:bg-slate-50">
                         <TableCell className="text-center text-slate-400 text-sm">
-                          {(page - 1) * 20 + idx + 1}
+                          {(page - 1) * limit + idx + 1}
                         </TableCell>
                         <TableCell className="font-mono font-semibold text-sm">{qc.frameNumber}</TableCell>
                         <TableCell className="font-mono text-sm text-slate-600">{qc.engineNumber || "—"}</TableCell>
@@ -396,7 +400,7 @@ export default function QCListPage() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-sm text-slate-600">{inspector?.name || "—"}</TableCell>
+                        <TableCell className="text-sm text-slate-600">{inspectorName}</TableCell>
                         <TableCell>
                           <div className="flex justify-center items-center gap-1.5">
                             {/* Nút hoàn thành – chỉ supervisor */}
@@ -433,21 +437,16 @@ export default function QCListPage() {
                 </TableBody>
               </Table>
 
-              {pagination && pagination.totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
-                  <span className="text-sm text-slate-500">
-                    Trang {pagination.page}/{pagination.totalPages} ({pagination.total} phiếu)
-                  </span>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                      ← Trước
-                    </Button>
-                    <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => setPage((p) => p + 1)}>
-                      Sau →
-                    </Button>
-                  </div>
-                </div>
-              )}
+              <div className="border-t border-slate-100 px-2">
+                <Pagination
+                  page={page}
+                  totalPages={pagination?.totalPages || 1}
+                  limit={limit}
+                  total={pagination?.total || 0}
+                  onPageChange={(p) => setPage(p)}
+                  onLimitChange={(l) => { setLimit(l); setPage(1); }}
+                />
+              </div>
             </>
           )}
         </CardContent>
