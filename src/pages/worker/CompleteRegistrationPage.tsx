@@ -32,7 +32,7 @@ export default function CompleteRegistrationPage() {
         if (reg.status === "completed") {
           toast.info("Đăng ký này đã hoàn thành");
           navigate("/worker");
-          return;
+          return null;
         }
         // If still registered, auto-start it
         if (reg.status === "registered") {
@@ -43,14 +43,13 @@ export default function CompleteRegistrationPage() {
             console.error("Auto-start failed:", err);
           }
         }
-        setRegistration(reg);
         if (reg.actualQuantity !== null && reg.actualQuantity !== undefined) {
           setActualQuantity(reg.actualQuantity);
           setInterruptionNote(reg.interruptionNote || "");
           setInterruptionMinutes(reg.interruptionMinutes || 0);
         }
       }
-      return (reg as Registration) || null;
+      return (reg as Registration) ?? null;
     },
     enabled: !!id,
   });

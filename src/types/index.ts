@@ -159,7 +159,11 @@ export interface ProductionStandard {
   updatedAt?: string;
 }
 
-export type RegistrationStatus = "in_progress" | "completed" | "cancelled";
+export type RegistrationStatus =
+  | "registered"
+  | "in_progress"
+  | "completed"
+  | "cancelled";
 
 export interface Registration {
   _id: string;

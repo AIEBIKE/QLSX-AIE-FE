@@ -138,7 +138,7 @@ export default function WorkerDashboard() {
     try {
       await api.startRegistration(regId);
       toast.success("Đã bắt đầu thao tác!");
-      loadData();
+      queryClient.invalidateQueries({ queryKey: ["workerDashboard"] });
     } catch (err: any) {
       toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
     }
@@ -150,7 +150,8 @@ export default function WorkerDashboard() {
     );
 
   const filteredOperations = operations.filter(
-    (op: any) => selectedProcess === "all" || op.processId?._id === selectedProcess,
+    (op: any) =>
+      selectedProcess === "all" || op.processId?._id === selectedProcess,
   );
 
   if (loading)
@@ -328,8 +329,8 @@ export default function WorkerDashboard() {
                                 }
                                 className="bg-[#0077c0] hover:bg-[#005f9e]"
                               >
-                                <CheckCircle className="w-3.5 h-3.5 mr-1" /> Nhập kết
-                                quả
+                                <CheckCircle className="w-3.5 h-3.5 mr-1" />{" "}
+                                Nhập kết quả
                               </Button>
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>

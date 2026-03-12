@@ -98,22 +98,30 @@ export default function QCInspectionPage() {
     onSuccess: () => {
       toast.success("Đã lưu kết quả kiểm tra!");
       queryClient.invalidateQueries({ queryKey: ["qc"] });
-      // Auto-increment for next vehicle
-      setAutoIndex((prev) => prev + 1);
+
+      // Cập nhật Auto-increment một cách an toàn
+      const nextIndex = autoIndex + 1;
+      setAutoIndex(nextIndex);
+
+      // Cập nhật số khung/số máy mới dựa trên Prefix
       if (framePrefix) {
-        setFrameNumber(
-          `${framePrefix}-${String(autoIndex + 1).padStart(3, "0")}`,
-        );
+        setFrameNumber(`${framePrefix}-${String(nextIndex).padStart(3, "0")}`);
       } else {
         setFrameNumber("");
       }
+
       if (enginePrefix) {
-        setEngineNumber(
-          `${enginePrefix}-${String(autoIndex + 1).padStart(3, "0")}`,
-        );
+        setEngineNumber(`${enginePrefix}-${String(nextIndex).padStart(3, "0")}`);
       } else {
         setEngineNumber("");
       }
+
+      // Reset kết quả kiểm tra để chuẩn bị cho xe tiếp theo
+      const resetResults: any = {};
+      operations.forEach((op: any) => {
+        resetResults[op._id] = { status: "pass", note: "" };
+      });
+      setResults(resetResults);
       setColor("");
     },
     onError: (err: any) => {

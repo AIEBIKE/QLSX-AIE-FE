@@ -51,6 +51,8 @@ import { useCreateProductionOrder, useDeleteProductionOrder } from "@/hooks/useM
 import Cookies from "js-cookie";
 import dayjs from "dayjs";
 import { Pagination } from "@/components/shared/Pagination";
+import * as api from "../../services/api";
+import { useQueryClient } from "@tanstack/react-query";
 
 const statusMap: Record<string, { label: string; className: string }> = {
   pending: {
@@ -85,6 +87,7 @@ const statusMap: Record<string, { label: string; className: string }> = {
 
 export default function ProductionOrdersPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const user = JSON.parse(
     localStorage.getItem("user") || Cookies.get("user") || "{}",
   );
@@ -185,7 +188,7 @@ export default function ProductionOrdersPage() {
     try {
       await api.updateProductionOrderStatus(id, "in_progress");
       toast.success("Đã bắt đầu lệnh sản xuất!");
-      loadData();
+      queryClient.invalidateQueries({ queryKey: ["productionOrders"] });
     } catch (err: any) {
       toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
     }

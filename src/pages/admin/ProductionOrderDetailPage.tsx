@@ -883,7 +883,9 @@ export default function ProductionOrderDetailPage() {
                               "in_progress",
                             );
                             toast.success("Đã bắt đầu lệnh sản xuất!");
-                            loadData();
+                            queryClient.invalidateQueries({
+                              queryKey: queryKeys.productionOrders.detail(id!),
+                            });
                           } catch (e: any) {
                             toast.error(
                               e.response?.data?.error?.message || e.message,

@@ -301,7 +301,7 @@ export const useCompleteRegistration = () => {
       data,
     }: {
       id: string;
-      data: { quantity: number; notes?: string };
+      data: { actualQuantity: number; interruptionNote?: string; interruptionMinutes?: number };
     }) => api.completeRegistration(id, data),
     onSuccess: () => {
       toast.success("Hoàn thành thành công");
