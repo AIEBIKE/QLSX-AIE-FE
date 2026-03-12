@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import {
   Car,
   FileText,
@@ -12,40 +11,33 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "../../contexts/AuthContext";
+import { useVehicleTypes, useActiveProductionOrder, useAllRegistrations } from "@/hooks/useQueries";
 import * as api from "../../services/api";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { data: stats, isLoading: loading } = useQuery({
-    queryKey: ["dashboardStats"],
-    queryFn: async () => {
-      const [vehicleTypesRes, activeOrderRes, registrationsRes] =
-        await Promise.all([
-          api.getVehicleTypes({ active: true }),
-          api.getActiveProductionOrder(),
-          api.getAllRegistrations({
-            date: new Date().toISOString().split("T")[0],
-          }),
-        ]);
-
-      const regs = registrationsRes.data.data || [];
-      const completed = regs.filter(
-        (r: any) => r.status === "completed",
-      ).length;
-
-      return {
-        vehicleTypes: (vehicleTypesRes.data as any).pagination?.total || 0,
-        activeOrder: activeOrderRes.data.data,
-        todayRegistrations:
-          (registrationsRes.data as any).count ||
-          (registrationsRes.data as any).pagination?.total ||
-          0,
-        completedRegistrations: completed,
-      };
-    },
-    staleTime: 30_000,
+  const { data: vtData, isLoading: vtLoading } = useVehicleTypes({ active: true });
+  const { data: activeOrder, isLoading: activeLoading } = useActiveProductionOrder();
+  const { data: registrationsData, isLoading: regsLoading } = useAllRegistrations({
+    date: new Date().toISOString().split("T")[0],
   });
+
+  const loading = vtLoading || activeLoading || regsLoading;
+
+  const stats = useMemo(() => {
+    if (!vtData || !registrationsData) return null;
+    
+    const regs = (registrationsData as any) || [];
+    const completed = regs.filter((r: any) => r.status === "completed").length;
+
+    return {
+      vehicleTypes: vtData.pagination?.total || 0,
+      activeOrder: activeOrder,
+      todayRegistrations: regs.length,
+      completedRegistrations: completed,
+    };
+  }, [vtData, activeOrder, registrationsData]);
 
   if (loading) {
     return (

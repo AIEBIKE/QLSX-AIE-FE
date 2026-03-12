@@ -64,7 +64,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import * as api from "../../services/api";
 import { useProductionOrder, useOrderProgress, useUsers, useOperations } from "@/hooks/useQueries";
-import { useCompleteOrder, useAssignWorker, useReassignRegistration } from "@/hooks/useMutations";
+import { useCompleteOrder, useAssignWorker, useReassignRegistration, useUpdateProductionOrderStatus } from "@/hooks/useMutations";
 import { queryKeys } from "@/hooks/queryKeys";
 
 const getProcessIcon = (processName = "") => {
@@ -128,6 +128,7 @@ export default function ProductionOrderDetailPage() {
   const completeMutation = useCompleteOrder();
   const assignMutation = useAssignWorker();
   const reassignMutation = useReassignRegistration();
+  const updateStatusMutation = useUpdateProductionOrderStatus();
 
   // ─── UI State ──────────────────────────────────────
   const [assignOpen, setAssignOpen] = useState(false);
@@ -876,24 +877,13 @@ export default function ProductionOrderDetailPage() {
                       <AlertDialogCancel>Hủy</AlertDialogCancel>
                       <AlertDialogAction
                         className="bg-[#0077c0]"
-                        onClick={async () => {
-                          try {
-                            await api.updateProductionOrderStatus(
-                              id!,
-                              "in_progress",
-                            );
-                            toast.success("Đã bắt đầu lệnh sản xuất!");
-                            queryClient.invalidateQueries({
-                              queryKey: queryKeys.productionOrders.detail(id!),
-                            });
-                          } catch (e: any) {
-                            toast.error(
-                              e.response?.data?.error?.message || e.message,
-                            );
-                          }
+                        disabled={updateStatusMutation.isPending}
+                        onClick={() => {
+                          if (!id) return;
+                          updateStatusMutation.mutate({ id, status: "in_progress" });
                         }}
                       >
-                        Bắt đầu
+                        {updateStatusMutation.isPending ? "Đang xử lý..." : "Bắt đầu"}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>

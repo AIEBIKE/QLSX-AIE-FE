@@ -7,7 +7,7 @@
 
 import { ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Toaster } from "sonner";
+import { Toaster } from "./components/ui/sonner";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
 // Layouts
@@ -329,7 +329,7 @@ function App() {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-        <Toaster richColors position="top-right" />
+        <Toaster />
       </AuthProvider>
     </BrowserRouter>
   );

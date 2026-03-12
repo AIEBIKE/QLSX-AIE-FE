@@ -142,6 +142,10 @@ export const deleteProductionStandard = (
   id: string,
 ): Promise<AxiosResponse<ApiResponse<null>>> =>
   api.delete(`/production-standards/${id}`);
+export const batchUpsertStandardOverrides = (
+  data: { overrides: Array<{ standardId: string; bonusPerUnit: number; penaltyPerUnit: number }>; factoryId?: string },
+): Promise<AxiosResponse<ApiResponse<null>>> =>
+  api.put("/production-standards/overrides/batch", data);
 
 // Processes
 export const getProcesses = (
@@ -253,6 +257,8 @@ export const assignWorkerToOrder = (
 // Users Management
 export const getUsers = (params?: Record<string, unknown>): Promise<AxiosResponse<PaginatedResponse<User>>> =>
   api.get("/auth/users", { params });
+export const getPendingUsers = (): Promise<AxiosResponse<ApiResponse<User[]>>> =>
+  api.get("/auth/users/pending");
 
 export const getUser = (
   id: string,
@@ -277,6 +283,10 @@ export const getAdminSalarySummary = (
   params?: Record<string, unknown>,
 ): Promise<AxiosResponse<PaginatedResponse<any>>> =>
   api.get("/auth/users/salary-summary", { params });
+export const approveUser = (id: string): Promise<AxiosResponse<ApiResponse<User>>> =>
+  api.put(`/auth/users/${id}/approve`);
+export const rejectUser = (id: string): Promise<AxiosResponse<ApiResponse<User>>> =>
+  api.put(`/auth/users/${id}/reject`);
 
 // Shifts
 export const startShift = (): Promise<AxiosResponse<ApiResponse<Shift>>> =>

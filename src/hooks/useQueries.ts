@@ -29,6 +29,16 @@ export const useUsers = (params?: Record<string, unknown>) =>
     },
   });
 
+export const usePendingUsers = (enabled = true) =>
+  useQuery({
+    queryKey: queryKeys.users.pending,
+    queryFn: async () => {
+      const res = await api.getPendingUsers();
+      return (res.data.data || []);
+    },
+    enabled,
+  });
+
 export const useUser = (id: string) =>
   useQuery({
     queryKey: queryKeys.users.detail(id),
@@ -174,6 +184,15 @@ export const useCurrentOrder = () =>
     queryKey: queryKeys.registrations.currentOrder,
     queryFn: async () => {
       const res = await api.getCurrentOrderWithOperations();
+      return res.data.data;
+    },
+  });
+
+export const useWorkerSalary = (params?: Record<string, unknown>) =>
+  useQuery({
+    queryKey: queryKeys.registrations.salary(params),
+    queryFn: async () => {
+      const res = await api.getWorkerSalary(params);
       return res.data.data;
     },
   });

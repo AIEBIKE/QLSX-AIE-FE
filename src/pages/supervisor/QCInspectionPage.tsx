@@ -34,6 +34,7 @@ import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "../../services/api";
 import dayjs from "dayjs";
+import * as apiHooks from "../../hooks/useMutations";
 
 export default function QCInspectionPage() {
   const navigate = useNavigate();
@@ -536,9 +537,9 @@ export default function QCInspectionPage() {
               <Button
                 className="bg-[#0077c0] hover:bg-[#005f9e]"
                 onClick={handleSubmit}
-                disabled={inspectMutation.isPending}
+                disabled={submitting}
               >
-                {inspectMutation.isPending ? (
+                {submitting ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
                   <Save className="w-4 h-4 mr-2" />
