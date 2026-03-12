@@ -537,13 +537,13 @@ export default function QCInspectionPage() {
               <Button
                 className="bg-[#0077c0] hover:bg-[#005f9e]"
                 onClick={handleSubmit}
-                disabled={submitting}
+                // disabled={submitting}
               >
-                {submitting ? (
+                {/* {submitting ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
                   <Save className="w-4 h-4 mr-2" />
-                )}
+                )} */}
                 Lưu phiếu kiểm duyệt
               </Button>
             )}
