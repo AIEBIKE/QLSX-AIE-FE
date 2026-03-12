@@ -8,8 +8,7 @@
 
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "sonner"; // [splinh-12/03-15:05]
 import {
   Loader2,
   UserPlus,
@@ -18,6 +17,8 @@ import {
   CheckCircle,
   Clock,
 } from "lucide-react";
+import * as apiHooks from "../../hooks/useMutations"; // [splinh-12/03-15:05]
+import * as queryHooks from "../../hooks/useQueries"; // [splinh-12/03-15:05]
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,10 +41,8 @@ import {
 
 import logoAiEbike from "@/assets/logo-aiebike.png";
 import {
-  registerApi,
   RegisterData,
-  getNextCodeApi,
-} from "@/services/authService";
+} from "@/services/authService"; // [splinh-12/03-15:05]
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -60,11 +59,7 @@ export default function RegisterPage() {
   const [isSuccess, setIsSuccess] = useState(false);
 
   // Fetch next code when role changes
-  const { data: nextCodeData, refetch: refetchNextCode } = useQuery({
-    queryKey: ["nextCode", role],
-    queryFn: () => getNextCodeApi(role),
-    enabled: true,
-  });
+  const { data: nextCodeData } = queryHooks.useNextCode(role); // [splinh-12/03-15:05]
 
   // Update code when next code is fetched
   useEffect(() => {
@@ -73,14 +68,12 @@ export default function RegisterPage() {
     }
   }, [nextCodeData]);
 
-  // Refetch when role changes
-  useEffect(() => {
-    refetchNextCode();
-  }, [role, refetchNextCode]);
 
-  const registerMutation = useMutation({
-    mutationFn: (data: RegisterData) => registerApi(data),
-    onSuccess: (data) => {
+  const registerMutation = apiHooks.useRegister(); // [splinh-12/03-15:05]
+
+  useEffect(() => {
+    if (registerMutation.isSuccess && registerMutation.data) {
+      const data = registerMutation.data;
       if (data.success) {
         setIsSuccess(true);
         toast.success("Đăng ký thành công!", {
@@ -88,19 +81,20 @@ export default function RegisterPage() {
         });
       } else {
         toast.error("Đăng ký thất bại", {
-          description: data.error?.message || "Có lỗi xảy ra",
+          description: (data as any).error?.message || "Có lỗi xảy ra",
         });
       }
-    },
-    onError: (error: unknown) => {
-      const err = error as {
-        response?: { data?: { error?: { message?: string } } };
-      };
+    }
+  }, [registerMutation.isSuccess, registerMutation.data]);
+
+  useEffect(() => {
+    if (registerMutation.isError && registerMutation.error) {
+      const err = registerMutation.error as any;
       const message =
         err.response?.data?.error?.message || "Có lỗi xảy ra, vui lòng thử lại";
       toast.error("Đăng ký thất bại", { description: message });
-    },
-  });
+    }
+  }, [registerMutation.isError, registerMutation.error]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

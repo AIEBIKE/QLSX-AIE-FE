@@ -30,8 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useQuery } from "@tanstack/react-query";
-import * as api from "../../services/api";
+import * as queryHooks from "../../hooks/useQueries"; // [splinh-12/03-14:33]
 import dayjs from "dayjs";
 
 export default function QCViewPage() {
@@ -45,14 +44,7 @@ export default function QCViewPage() {
   const OPS_PER_PAGE = 6;
 
   // Load QC detail
-  const { data: qcData, isLoading: loadingQC } = useQuery({
-    queryKey: ["qcDetail", id],
-    queryFn: async () => {
-      const res = await api.getQCDetail(id!);
-      return res.data.data;
-    },
-    enabled: !!id,
-  });
+  const { data: qcData, isLoading: loadingQC } = queryHooks.useQCDetail(id); // [splinh-12/03-14:33]
 
   // Load all operations for the vehicle type from order
   const vehicleTypeId = useMemo(() => {
@@ -63,16 +55,7 @@ export default function QCViewPage() {
     return typeof vt === "object" ? (vt as any)._id : vt;
   }, [qcData]);
 
-  const { data: opsData } = useQuery({
-    queryKey: ["operationsForQCView", vehicleTypeId],
-    queryFn: async () => {
-      const res = await api.getOperations({ vehicleTypeId });
-      return res.data.data;
-    },
-    enabled: !!vehicleTypeId,
-  });
-
-  const operations: any[] = opsData || [];
+  const { data: operations = [] } = queryHooks.useOperations({ vehicleTypeId }); // [splinh-12/03-14:33]
 
   // Build results map from qcData
   const results = useMemo(() => {

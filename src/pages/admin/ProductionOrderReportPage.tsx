@@ -5,8 +5,7 @@ import { ArrowLeft, Printer, Loader2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useQuery } from "@tanstack/react-query";
-import * as api from "../../services/api";
+import * as queryHooks from "../../hooks/useQueries"; // [splinh-12/03-14:48]
 import { ProductionOrderReport } from "../../types";
 
 const statusColors: Record<string, string> = {
@@ -36,14 +35,7 @@ export default function ProductionOrderReportPage() {
     return () => window.removeEventListener("resize", h);
   }, []);
 
-  const { data: report, isLoading: loading } = useQuery<ProductionOrderReport>({
-    queryKey: ["orderReport", id],
-    queryFn: async () => {
-      const res = await api.getOrderReport(id || "");
-      return res.data.data;
-    },
-    enabled: !!id,
-  });
+  const { data: report, isLoading: loading } = queryHooks.useOrderReport(id); // [splinh-12/03-14:48]
 
   const formatMinutes = (minutes: number) => {
     if (!minutes) return "0 phút";

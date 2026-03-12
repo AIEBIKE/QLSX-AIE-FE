@@ -48,8 +48,9 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import * as api from "../../services/api";
+import { useQueryClient } from "@tanstack/react-query"; // [splinh-12/03-14:43]
+import * as apiHooks from "../../hooks/useMutations"; // [splinh-12/03-14:43]
+import * as queryHooks from "../../hooks/useQueries"; // [splinh-12/03-14:43]
 import { Pagination } from "@/components/shared/Pagination";
 import {
   useCreateProductionStandard,
@@ -97,24 +98,12 @@ export default function ProductionStandardsPage() {
 
   const queryClient = useQueryClient();
 
-  const { data: initData, isLoading: loadingInit } = useQuery({
-    queryKey: ["standards_init", isAdmin],
-    queryFn: async () => {
-      const [vtRes, fRes] = await Promise.all([
-        api.getVehicleTypes({ active: true, limit: 100 }),
-        isAdmin
-          ? api.getFactories()
-          : Promise.resolve({ data: { data: [] } }),
-      ]);
-      return {
-        vehicleTypes: (vtRes as any).data.data || [],
-        factories: isAdmin ? (fRes as any).data.data || [] : [],
-      };
-    },
-  });
+  const { data: vtData, isLoading: loadingVT } = queryHooks.useVehicleTypes({ active: true, limit: 100 }); // [splinh-12/03-14:43]
+  const { data: factoriesData, isLoading: loadingFac } = queryHooks.useFactories(isAdmin); // [splinh-12/03-14:43]
 
-  const vehicleTypes = initData?.vehicleTypes || [];
-  const factories = initData?.factories || [];
+  const vehicleTypes = vtData?.data || [];
+  const factories = factoriesData || [];
+  const loadingInit = loadingVT || (isAdmin && loadingFac);
 
   // Auto-select first vehicle type
   useEffect(() => {
@@ -123,27 +112,12 @@ export default function ProductionStandardsPage() {
     }
   }, [vehicleTypes]);
 
-  const { data: standardsData, isLoading: loadingStandards } = useQuery({
-    queryKey: [
-      "standards",
-      selectedVehicleType?._id,
-      selectedFactory,
-      pagination.page,
-      pagination.limit,
-      searchTerm,
-    ],
-    queryFn: async () => {
-      const query: any = {
-        vehicleTypeId: selectedVehicleType._id,
-        page: pagination.page,
-        limit: pagination.limit,
-        search: searchTerm || undefined,
-        factoryId: selectedFactory || undefined,
-      };
-      const res = await api.getProductionStandards(query);
-      return res.data;
-    },
-    enabled: !!selectedVehicleType,
+  const { data: standardsData, isLoading: loadingStandards } = queryHooks.useProductionStandards({ // [splinh-12/03-14:43]
+    vehicleTypeId: selectedVehicleType?._id,
+    page: pagination.page,
+    limit: pagination.limit,
+    search: searchTerm || undefined,
+    factoryId: selectedFactory || undefined,
   });
 
   const standards = standardsData?.data || [];
@@ -160,36 +134,15 @@ export default function ProductionStandardsPage() {
     setHasChanges(false);
   }, [standardsData]);
 
-  const { data: operations = [] } = useQuery({
-    queryKey: ["standards_operations", selectedVehicleType?._id],
-    queryFn: async () => {
-      const processRes = await api.getProcesses({
-        vehicleTypeId: selectedVehicleType._id,
-        limit: 100,
-      });
-      const processes = (processRes as any).data.data || [];
-      let allOperations: any[] = [];
-      for (const process of processes) {
-        const opRes = await api.getOperations({
-          processId: process._id,
-          limit: 100,
-        });
-        const ops = ((opRes as any).data.data || []).map((op: any) => ({
-          ...op,
-          processName: process.name,
-        }));
-        allOperations = [...allOperations, ...ops];
-      }
-      return allOperations;
-    },
-    enabled: !!selectedVehicleType,
-  });
+  // Fetch all operations for selection - keeping complex mapping but using queryHooks
+  const { data: operations = [] } = queryHooks.useOperations({ vehicleTypeId: selectedVehicleType?._id, limit: 200 }); // [splinh-12/03-14:43]
 
   const loading = loadingInit || loadingStandards;
 
-  const createMutation = useCreateProductionStandard();
-  const updateMutation = useUpdateProductionStandard();
-  const deleteMutation = useDeleteProductionStandard();
+  const createMutation = useCreateProductionStandard(); // [splinh-12/03-14:43]
+  const updateMutation = useUpdateProductionStandard(); // [splinh-12/03-14:43]
+  const deleteMutation = useDeleteProductionStandard(); // [splinh-12/03-14:43]
+  const batchUpsertMutation = apiHooks.useBatchUpsertStandardOverrides(); // [splinh-12/03-14:43]
 
   const handleSubmit = () => {
     const data = {
@@ -213,7 +166,7 @@ export default function ProductionStandardsPage() {
     });
   };
 
-  const handleInlineEdit = (standardId: string, field: string, value: any) => {
+  const handleInlineEdit = (standardId: string, field: string, value: any) => { // [splinh-12/03-14:46]
     setEditedStandards((prev) => ({
       ...prev,
       [standardId]: { ...prev[standardId], [field]: value },
@@ -221,50 +174,30 @@ export default function ProductionStandardsPage() {
     setHasChanges(true);
   };
 
-  const handleSaveChanges = async () => {
-    try {
-      // Separate override changes (bonus/penalty) from standard changes (expectedQuantity)
-      const overrideEntries: Array<{ standardId: string; bonusPerUnit: number; penaltyPerUnit: number }> = [];
-      const standardUpdates: Array<{ id: string; data: any }> = [];
-
-      for (const [id, changes] of Object.entries(editedStandards)) {
-        const { bonusPerUnit, penaltyPerUnit, ...stdChanges } = changes as any;
-        // bonus/penalty edits go to factory overrides
-        if (bonusPerUnit !== undefined || penaltyPerUnit !== undefined) {
-          const std = standards.find((s: any) => s._id === id);
-          overrideEntries.push({
-            standardId: id,
-            bonusPerUnit: bonusPerUnit ?? std?.bonusPerUnit ?? 0,
-            penaltyPerUnit: penaltyPerUnit ?? std?.penaltyPerUnit ?? 0,
-          });
-        }
-        // Other changes (expectedQuantity) go to standard update
-        if (Object.keys(stdChanges).length > 0) {
-          standardUpdates.push({ id, data: stdChanges });
-        }
-      }
-
-      const promises: Promise<any>[] = [];
-
-      if (overrideEntries.length > 0) {
-        promises.push(
-          api.batchUpsertStandardOverrides({
-            overrides: overrideEntries,
-            factoryId: selectedFactory || undefined,
-          })
-        );
-      }
-
-      for (const { id, data } of standardUpdates) {
-        promises.push(updateMutation.mutateAsync({ id, data }));
-      }
-
-      await Promise.all(promises);
-      toast.success("Lưu thành công!");
-      queryClient.invalidateQueries({ queryKey: ["standards"] });
-    } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
+  const handleSaveChanges = () => { // [splinh-12/03-14:46]
+    if (!selectedFactory && isAdmin) {
+      toast.error("Vui lòng chọn nhà máy");
+      return;
     }
+
+    const overrides = Object.entries(editedStandards).map(([id, values]) => ({
+      standardId: id,
+      bonusPerUnit: values.bonusPerUnit,
+      penaltyPerUnit: values.penaltyPerUnit,
+    }));
+
+    batchUpsertMutation.mutate(
+      {
+        factoryId: selectedFactory || undefined,
+        overrides,
+      },
+      {
+        onSuccess: () => {
+          setHasChanges(false);
+          setEditedStandards({});
+        },
+      }
+    );
   };
 
   const handleDelete = (id: string) => {
@@ -705,9 +638,9 @@ export default function ProductionStandardsPage() {
                   <SelectValue placeholder="Chọn thao tác..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {operations.map((op) => (
+                  {operations.map((op: any) => ( // [splinh-12/03-14:46]
                     <SelectItem key={op._id} value={op._id}>
-                      [{op.processName}] {op.name}
+                      [{op.processId?.name || (op.process as any)?.name || "N/A"}] {op.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

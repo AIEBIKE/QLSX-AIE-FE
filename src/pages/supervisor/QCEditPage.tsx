@@ -28,15 +28,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toast } from "sonner";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import * as api from "../../services/api";
+import { toast } from "sonner"; // [splinh-12/03-14:36]
+// [splinh-12/03-14:36]
 import dayjs from "dayjs";
+import * as apiHooks from "../../hooks/useMutations"; // [splinh-12/03-14:34]
+import * as queryHooks from "../../hooks/useQueries"; // [splinh-12/03-14:34]
 
 export default function QCEditPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const navigate = useNavigate(); // [splinh-12/03-14:36]
 
   // Vehicle info state
   const [frameNumber, setFrameNumber] = useState("");
@@ -57,14 +57,7 @@ export default function QCEditPage() {
   >({});
 
   // Load QC detail
-  const { data: qcData, isLoading: loadingQC } = useQuery({
-    queryKey: ["qcDetail", id],
-    queryFn: async () => {
-      const res = await api.getQCDetail(id!);
-      return res.data.data;
-    },
-    enabled: !!id,
-  });
+  const { data: qcData, isLoading: loadingQC } = queryHooks.useQCDetail(id); // [splinh-12/03-14:34]
 
   // Load all operations for the vehicle type from order
   const vehicleTypeId = useMemo(() => {
@@ -75,16 +68,7 @@ export default function QCEditPage() {
     return typeof vt === "object" ? (vt as any)._id : vt;
   }, [qcData]);
 
-  const { data: opsData } = useQuery({
-    queryKey: ["operationsForQCEdit", vehicleTypeId],
-    queryFn: async () => {
-      const res = await api.getOperations({ vehicleTypeId });
-      return res.data.data;
-    },
-    enabled: !!vehicleTypeId,
-  });
-
-  const operations: any[] = opsData || [];
+  const { data: operations = [] } = queryHooks.useOperations({ vehicleTypeId }); // [splinh-12/03-14:34]
 
   // Initialize state from loaded QC
   useEffect(() => {
@@ -185,17 +169,7 @@ export default function QCEditPage() {
     }));
   };
 
-  const updateMutation = useMutation({
-    mutationFn: (payload: any) => api.updateQC(id!, payload),
-    onSuccess: () => {
-      toast.success("Đã cập nhật phiếu kiểm duyệt!");
-      queryClient.invalidateQueries({ queryKey: ["qcList"] });
-      queryClient.invalidateQueries({ queryKey: ["qcDetail", id] });
-    },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.error?.message || "Lỗi khi cập nhật phiếu");
-    },
-  });
+  const updateMutation = apiHooks.useUpdateQC(); // [splinh-12/03-14:34]
 
   const handleSubmit = () => {
     if (!frameNumber) {
@@ -212,10 +186,13 @@ export default function QCEditPage() {
       note: data.note,
     }));
 
-    updateMutation.mutate({
-      color,
-      inspectionDate,
-      results: resultList,
+    updateMutation.mutate({ // [splinh-12/03-14:34]
+      id: id!,
+      data: {
+        color,
+        inspectionDate,
+        results: resultList,
+      },
     });
   };
 

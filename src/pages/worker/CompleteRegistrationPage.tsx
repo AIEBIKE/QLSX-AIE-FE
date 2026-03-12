@@ -10,9 +10,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import * as api from "../../services/api";
-import * as apiHooks from "../../hooks/useMutations";
+import { useQueryClient } from "@tanstack/react-query"; // [splinh-12/03-14:36]
+import * as apiHooks from "../../hooks/useMutations"; // [splinh-12/03-14:52]
+import * as queryHooks from "../../hooks/useQueries"; // [splinh-12/03-14:52]
 import { Registration } from "../../types";
 
 export default function CompleteRegistrationPage() {
@@ -26,35 +26,30 @@ export default function CompleteRegistrationPage() {
   const { mutate: submitMutation, isPending: submitting } = apiHooks.useCompleteRegistration();
   const { mutate: startMutation } = apiHooks.useStartRegistration();
 
-  const { data: registration, isLoading: loading } = useQuery<Registration | null>({
-    queryKey: ["registration", id],
-    queryFn: async () => {
-      const res = await api.getTodayRegistrations();
-      const reg = res.data.data?.find((r: any) => r._id === id);
-      if (reg) {
-        // If already completed, redirect back
-        if (reg.status === "completed") {
-          toast.info("Đăng ký này đã hoàn thành");
-          navigate("/worker");
-          return null;
-        }
-        // If still registered, auto-start it
-        if (reg.status === "registered") {
-          startMutation(id || "", {
-            onSuccess: () => {
-              queryClient.invalidateQueries({ queryKey: ["registration", id] });
-            }
-          });
-        }
-        if (reg.actualQuantity !== null && reg.actualQuantity !== undefined) {
-          setActualQuantity(reg.actualQuantity);
-          setInterruptionNote(reg.interruptionNote || "");
-          setInterruptionMinutes(reg.interruptionMinutes || 0);
-        }
+  const { data: registrations = [], isLoading: loading } = queryHooks.useTodayRegistrations(); // [splinh-12/03-14:52]
+
+  const registration = registrations.find((r: any) => r._id === id) as Registration | undefined;
+
+  // Auto-start or redirect logic in useEffect
+  useState(() => {
+    if (registration) {
+      if (registration.status === "completed") {
+        toast.info("Đăng ký này đã hoàn thành");
+        navigate("/worker");
+      } else if (registration.status === "registered") {
+        startMutation(id || "", {
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["registrations_today"] });
+          }
+        });
       }
-      return (reg as Registration) ?? null;
-    },
-    enabled: !!id,
+      
+      if (registration.actualQuantity !== null && registration.actualQuantity !== undefined) {
+        setActualQuantity(registration.actualQuantity);
+        setInterruptionNote(registration.interruptionNote || "");
+        setInterruptionMinutes(registration.interruptionMinutes || 0);
+      }
+    }
   });
 
   const handleSubmit = (e: React.FormEvent) => {

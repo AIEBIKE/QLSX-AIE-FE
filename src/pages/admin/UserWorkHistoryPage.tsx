@@ -5,8 +5,7 @@ import { ArrowLeft, Filter, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useQuery } from "@tanstack/react-query";
-import * as api from "../../services/api";
+import * as queryHooks from "../../hooks/useQueries"; // [splinh-12/03-14:38]
 import { Pagination } from "@/components/shared/Pagination";
 
 const statusColors: Record<string, string> = {
@@ -37,21 +36,11 @@ export default function UserWorkHistoryPage() {
     return () => window.removeEventListener("resize", h);
   }, []);
 
-  const { data: historyData, isLoading: loading } = useQuery({
-    queryKey: ["userWorkHistory", id, startDate, endDate, page, limit],
-    queryFn: async () => {
-      const params: any = { page, limit };
-      if (startDate) params.startDate = new Date(startDate).toISOString();
-      if (endDate) params.endDate = new Date(endDate).toISOString();
-      const res = await api.getUserWorkHistory(id as string, params);
-      return {
-        user: res.data.meta?.user,
-        registrations: res.data.data,
-        statistics: res.data.meta?.statistics,
-        pagination: res.data.pagination,
-      };
-    },
-    enabled: !!id,
+  const { data: historyData, isLoading: loading } = queryHooks.useUserWorkHistory(id, { // [splinh-12/03-14:38]
+    page,
+    limit,
+    startDate: startDate ? new Date(startDate).toISOString() : undefined,
+    endDate: endDate ? new Date(endDate).toISOString() : undefined,
   });
 
   const data = historyData || null;
@@ -75,7 +64,7 @@ export default function UserWorkHistoryPage() {
       currency: "VND",
     }).format(value || 0);
 
-  const { user, registrations, statistics } = data || {};
+  const { user, registrations, statistics } = (historyData as any) || {}; // [splinh-12/03-14:48]
 
   if (loading && !data) {
     return (
