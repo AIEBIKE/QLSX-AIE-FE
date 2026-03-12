@@ -36,7 +36,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           info: "group-[.toaster]:bg-blue-50 group-[.toaster]:text-blue-800 group-[.toaster]:border-blue-200",
         },
       }}
-      position="top-right"
+      position="top-center"
       richColors
       closeButton
       {...props}

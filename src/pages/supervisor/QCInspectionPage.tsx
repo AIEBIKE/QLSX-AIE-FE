@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "../../services/api";
+import * as apiHooks from "../../hooks/useMutations";
 
 export default function QCInspectionPage() {
   const navigate = useNavigate();
@@ -93,56 +94,49 @@ export default function QCInspectionPage() {
     }));
   };
 
-  const inspectMutation = useMutation({
-    mutationFn: (payload: any) => api.inspectVehicle(payload),
-    onSuccess: () => {
-      toast.success("Đã lưu kết quả kiểm tra!");
-      queryClient.invalidateQueries({ queryKey: ["qc"] });
-
-      // Cập nhật Auto-increment một cách an toàn
-      const nextIndex = autoIndex + 1;
-      setAutoIndex(nextIndex);
-
-      // Cập nhật số khung/số máy mới dựa trên Prefix
-      if (framePrefix) {
-        setFrameNumber(`${framePrefix}-${String(nextIndex).padStart(3, "0")}`);
-      } else {
-        setFrameNumber("");
-      }
-
-      if (enginePrefix) {
-        setEngineNumber(`${enginePrefix}-${String(nextIndex).padStart(3, "0")}`);
-      } else {
-        setEngineNumber("");
-      }
-
-      // Reset kết quả kiểm tra để chuẩn bị cho xe tiếp theo
-      const resetResults: any = {};
-      operations.forEach((op: any) => {
-        resetResults[op._id] = { status: "pass", note: "" };
-      });
-      setResults(resetResults);
-      setColor("");
-    },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.error?.message || "Lỗi khi lưu kết quả");
-    },
-  });
+  const { mutate: inspectMutation, isPending: submitting } = apiHooks.useInspectVehicle();
 
   const handleSubmit = () => {
     if (!frameNumber) {
       toast.error("Vui lòng nhập số khung");
       return;
     }
-    inspectMutation.mutate({
+    inspectMutation({
       frameNumber,
       engineNumber,
       color,
       results: Object.entries(results).map(([opId, data]) => ({
         operationId: opId,
-        status: data.status,
-        note: data.note,
+        status: (data as any).status,
+        note: (data as any).note,
       })),
+    }, {
+      onSuccess: () => {
+        // Cập nhật Auto-increment một cách an toàn
+        const nextIndex = autoIndex + 1;
+        setAutoIndex(nextIndex);
+
+        // Cập nhật số khung/số máy mới dựa trên Prefix
+        if (framePrefix) {
+          setFrameNumber(`${framePrefix}-${String(nextIndex).padStart(3, "0")}`);
+        } else {
+          setFrameNumber("");
+        }
+
+        if (enginePrefix) {
+          setEngineNumber(`${enginePrefix}-${String(nextIndex).padStart(3, "0")}`);
+        } else {
+          setEngineNumber("");
+        }
+
+        // Reset kết quả kiểm tra để chuẩn bị cho xe tiếp theo
+        const resetResults: any = {};
+        operations.forEach((op: any) => {
+          resetResults[op._id] = { status: "pass", note: "" };
+        });
+        setResults(resetResults);
+        setColor("");
+      }
     });
   };
 
@@ -351,9 +345,9 @@ export default function QCInspectionPage() {
               <Button
                 className="bg-[#0077c0] hover:bg-[#005f9e]"
                 onClick={handleSubmit}
-                disabled={inspectMutation.isPending}
+                disabled={submitting}
               >
-                {inspectMutation.isPending ? (
+                {submitting ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
                   <Save className="w-4 h-4 mr-2" />

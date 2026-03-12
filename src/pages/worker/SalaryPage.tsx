@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "../../contexts/AuthContext";
-import { useQuery } from "@tanstack/react-query";
+import { useWorkerSalary } from "@/hooks/useQueries";
 import * as api from "../../services/api";
 import dayjs from "dayjs";
 
@@ -22,24 +22,13 @@ export default function SalaryPage() {
   const { user } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(dayjs().format("YYYY-MM"));
 
-  const { data: salaryResult, isLoading: loading } = useQuery({
-    queryKey: ["workerSalary", selectedMonth],
-    queryFn: async () => {
-      const d = dayjs(selectedMonth);
-      const month = d.month() + 1;
-      const year = d.year();
-      const res = await api.getWorkerSalary({ month, year });
-      const data: any = res.data.data;
-      return {
-        summary: data?.summary || null,
-        dailyDetails: data?.dailyDetails || [],
-      };
-    },
-    staleTime: 30_000,
+  const { data: salaryResult, isLoading: loading } = useWorkerSalary({
+    month: dayjs(selectedMonth).month() + 1,
+    year: dayjs(selectedMonth).year(),
   });
 
-  const salaryData = salaryResult?.summary || null;
-  const dailyBreakdown = salaryResult?.dailyDetails || [];
+  const salaryData = (salaryResult as any)?.summary || null;
+  const dailyBreakdown = (salaryResult as any)?.dailyDetails || [];
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("vi-VN").format(value || 0);
@@ -136,7 +125,7 @@ export default function SalaryPage() {
       </div>
 
       {/* Net Income Card */}
-      <Card className="mb-6 bg-gradient-to-r from-[#0077c0] to-[#005f9e] text-white border-0">
+      <Card className="mb-6 bg-linear-to-r from-[#0077c0] to-[#005f9e] text-white border-0">
         <CardContent className="pt-6 pb-6">
           <div className="flex justify-between items-center flex-wrap gap-4">
             <div>

@@ -11,7 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { useQuery } from "@tanstack/react-query";
+import { useAdminSalarySummary } from "@/hooks/useQueries";
 import dayjs from "dayjs";
 import {
   Users,
@@ -119,13 +119,7 @@ export default function AdminSalarySummaryPage() {
     return p;
   }, [period, startDate, endDate, pagination.page, pagination.limit]);
 
-  const { data: resData, isLoading } = useQuery({
-    queryKey: ["workersSalary", queryParams],
-    queryFn: async () => {
-      const res = await api.getAdminSalarySummary(queryParams);
-      return res.data as SalaryResponse;
-    },
-  });
+  const { data: resData, isLoading } = useAdminSalarySummary(queryParams);
 
   const data = resData?.meta;
   const workers = resData?.data || [];

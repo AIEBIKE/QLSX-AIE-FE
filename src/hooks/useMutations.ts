@@ -239,6 +239,32 @@ export const useDeleteUser = () => {
   });
 };
 
+export const useApproveUser = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.approveUser(id),
+    onSuccess: () => {
+      toast.success("Đã phê duyệt tài khoản");
+      qc.invalidateQueries({ queryKey: queryKeys.users.all });
+      qc.invalidateQueries({ queryKey: ["pendingUsers"] });
+    },
+    onError: (err: any) => toast.error(getErrMsg(err, "Lỗi phê duyệt")),
+  });
+};
+
+export const useRejectUser = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.rejectUser(id),
+    onSuccess: () => {
+      toast.success("Đã từ chối tài khoản");
+      qc.invalidateQueries({ queryKey: queryKeys.users.all });
+      qc.invalidateQueries({ queryKey: ["pendingUsers"] });
+    },
+    onError: (err: any) => toast.error(getErrMsg(err, "Lỗi từ chối")),
+  });
+};
+
 // ─── Factories ──────────────────────────────────────
 
 export const useCreateFactory = () => {
@@ -288,8 +314,35 @@ export const useRegisterOperation = () => {
     onSuccess: () => {
       toast.success("Đăng ký thành công");
       qc.invalidateQueries({ queryKey: queryKeys.registrations.all });
+      qc.invalidateQueries({ queryKey: ["workerDashboard"] });
     },
     onError: (err: any) => toast.error(getErrMsg(err, "Lỗi đăng ký")),
+  });
+};
+
+export const useStartRegistration = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.startRegistration(id),
+    onSuccess: () => {
+      toast.success("Đã bắt đầu thao tác!");
+      qc.invalidateQueries({ queryKey: queryKeys.registrations.all });
+      qc.invalidateQueries({ queryKey: ["workerDashboard"] });
+    },
+    onError: (err: any) => toast.error(getErrMsg(err, "Lỗi bắt đầu")),
+  });
+};
+
+export const useCancelRegistration = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.cancelRegistration(id),
+    onSuccess: () => {
+      toast.success("Đã hủy đăng ký");
+      qc.invalidateQueries({ queryKey: queryKeys.registrations.all });
+      qc.invalidateQueries({ queryKey: ["workerDashboard"] });
+    },
+    onError: (err: any) => toast.error(getErrMsg(err, "Lỗi hủy đăng ký")),
   });
 };
 

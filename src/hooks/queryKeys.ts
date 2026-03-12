@@ -67,6 +67,8 @@ export const queryKeys = {
     currentOrder: ["registrations", "current-order"] as const,
     adminAll: (params?: Record<string, unknown>) =>
       ["registrations", "admin", "all", params] as const,
+    salary: (params?: Record<string, unknown>) =>
+      ["registrations", "salary", params] as const,
   },
 
   // Shifts
