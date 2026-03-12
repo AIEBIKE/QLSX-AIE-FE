@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Maximize2, Trash2, Eye, Loader2 } from "lucide-react";
+import { Plus, Search, Maximize2, Trash2, Eye, Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -46,12 +46,21 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import * as api from "@/services/api";
+import { useProductionOrders, useVehicleTypes, useFactories } from "@/hooks/useQueries";
+import { useCreateProductionOrder, useDeleteProductionOrder } from "@/hooks/useMutations";
 import Cookies from "js-cookie";
 import dayjs from "dayjs";
 import { Pagination } from "@/components/shared/Pagination";
 
 const statusMap: Record<string, { label: string; className: string }> = {
+  pending: {
+    label: "Chờ bắt đầu",
+    className: "bg-slate-100 text-slate-700 border-slate-200",
+  },
+  in_progress: {
+    label: "Đang sản xuất",
+    className: "bg-blue-100 text-blue-700 border-blue-200",
+  },
   active: {
     label: "Đang sản xuất",
     className: "bg-blue-100 text-blue-700 border-blue-200",
@@ -86,22 +95,12 @@ export default function ProductionOrdersPage() {
   const canEdit = isFacManager; // Only Factory Manager can CRUD orders
   const canView = isAdmin || isFacManager || isSupervisor;
 
-  const [orders, setOrders] = useState<any[]>([]);
-  const [vehicleTypes, setVehicleTypes] = useState<any[]>([]);
-  const [factories, setFactories] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [selectedFactory, setSelectedFactory] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
-
-  // Pagination state
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 1,
-  });
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
   const [formData, setFormData] = useState({
     vehicleTypeId: "",
@@ -116,9 +115,31 @@ export default function ProductionOrdersPage() {
     engineNumberPrefix: "",
   });
 
-  useEffect(() => {
-    loadData();
-  }, [selectedFactory, pagination.page, pagination.limit]);
+  // ─── React Query: Fetch data ───────────────────────
+  const orderParams = useMemo(() => ({
+    factoryId: selectedFactory !== "all" ? selectedFactory : undefined,
+    page,
+    limit,
+    search: searchTerm || undefined,
+  }), [selectedFactory, page, limit, searchTerm]);
+
+  const { data: ordersData, isLoading: loading } = useProductionOrders(orderParams);
+  const { data: vtData } = useVehicleTypes({ active: true, limit: 100 });
+  const { data: factoriesData } = useFactories(isAdmin);
+
+  const orders = ordersData?.data || [];
+  const pagination = {
+    page,
+    limit,
+    total: ordersData?.pagination?.total || 0,
+    totalPages: ordersData?.pagination?.totalPages || 1,
+  };
+  const vehicleTypes = vtData?.data || [];
+  const factories = factoriesData || [];
+
+  // ─── React Query: Mutations ────────────────────────
+  const createMutation = useCreateProductionOrder();
+  const deleteMutation = useDeleteProductionOrder();
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -127,78 +148,46 @@ export default function ProductionOrdersPage() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [ordersRes, vtRes, fRes] = await Promise.all([
-        api.getProductionOrders({
-          factoryId: selectedFactory !== "all" ? selectedFactory : undefined,
-          page: pagination.page,
-          limit: pagination.limit,
-          search: searchTerm || undefined,
-        }),
-        api.getVehicleTypes({ active: true, limit: 100 }),
-        isAdmin ? api.getFactories() : Promise.resolve({ data: { data: [] } }),
-      ]);
-
-      setOrders(ordersRes.data.data || []);
-      if (ordersRes.data.pagination) {
-        setPagination((prev) => ({
-          ...prev,
-          total: ordersRes.data.pagination.total,
-          totalPages: ordersRes.data.pagination.totalPages,
-        }));
-      }
-      setVehicleTypes(vtRes.data.data || []);
-      if (isAdmin) setFactories((fRes as any).data.data || []);
-    } catch {
-      toast.error("Lỗi tải dữ liệu");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setPagination((prev) => ({ ...prev, page: 1 }));
-    loadData();
+    setPage(1);
   };
 
   const handleSubmit = async () => {
-    try {
-      const data: any = {
-        ...formData,
-        frameNumbers: formData.frameNumbers
-          .split("\n")
-          .map((s) => s.trim())
-          .filter(Boolean),
-        engineNumbers: formData.engineNumbers
-          .split("\n")
-          .map((s) => s.trim())
-          .filter(Boolean),
-      };
-      // Gửi prefix nếu có (backend sẽ tự sinh)
-      if (formData.frameNumberPrefix)
-        data.frameNumberPrefix = formData.frameNumberPrefix;
-      if (formData.engineNumberPrefix)
-        data.engineNumberPrefix = formData.engineNumberPrefix;
-      await api.createProductionOrder(data as any);
-      toast.success("Tạo lệnh thành công");
-      setModalOpen(false);
-      resetForm();
-      loadData();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Lỗi tạo lệnh");
-    }
+    const data: any = {
+      ...formData,
+      frameNumbers: formData.frameNumbers
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      engineNumbers: formData.engineNumbers
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    };
+    if (formData.frameNumberPrefix)
+      data.frameNumberPrefix = formData.frameNumberPrefix;
+    if (formData.engineNumberPrefix)
+      data.engineNumberPrefix = formData.engineNumberPrefix;
+    createMutation.mutate(data, {
+      onSuccess: () => {
+        setModalOpen(false);
+        resetForm();
+      },
+    });
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
+    deleteMutation.mutate(id);
+  };
+
+  const handleStartOrder = async (id: string) => {
     try {
-      await api.deleteProductionOrder(id);
-      toast.success("Xóa thành công");
+      await api.updateProductionOrderStatus(id, "in_progress");
+      toast.success("Đã bắt đầu lệnh sản xuất!");
       loadData();
     } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Lỗi khi xóa");
+      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
     }
   };
 
@@ -310,12 +299,12 @@ export default function ProductionOrdersPage() {
                             <div className="font-bold text-slate-800 text-lg group-hover:text-[#0077c0] transition-colors">
                               {order.orderCode}
                             </div>
-                            <div className="text-sm font-medium text-slate-600 mt-0.5">
-                              {order.vehicleTypeId?.name}
-                            </div>
-                            <div className="text-xs text-slate-400 mt-0.5">
-                              🏭 {order.factoryId?.name || "—"}
-                            </div>
+                             <div className="text-sm font-medium text-slate-600 mt-0.5">
+                               {typeof order.vehicleTypeId === "object" ? order.vehicleTypeId.name : (order.vehicleType as any)?.name || order.vehicleTypeId}
+                             </div>
+                             <div className="text-xs text-slate-400 mt-0.5">
+                               🏭 {typeof order.factoryId === "object" ? order.factoryId.name : "—"}
+                             </div>
                           </div>
                           <Badge
                             variant="outline"
@@ -403,19 +392,19 @@ export default function ProductionOrdersPage() {
                           <TableCell className="font-bold text-slate-900 font-mono">
                             {order.orderCode}
                           </TableCell>
-                          <TableCell>
-                            <div className="font-medium text-slate-700">
-                              {order.vehicleTypeId?.name}
-                            </div>
-                            <div className="text-xs text-slate-400 font-mono">
-                              {order.vehicleTypeId?.code}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm text-slate-600">
-                              {order.factoryId?.name || "—"}
-                            </span>
-                          </TableCell>
+                           <TableCell>
+                             <div className="font-medium text-slate-700">
+                               {typeof order.vehicleTypeId === "object" ? order.vehicleTypeId.name : (order.vehicleType as any)?.name || order.vehicleTypeId}
+                             </div>
+                             <div className="text-xs text-slate-400 font-mono">
+                               {typeof order.vehicleTypeId === "object" ? order.vehicleTypeId.code : (order.vehicleType as any)?.code}
+                             </div>
+                           </TableCell>
+                           <TableCell>
+                             <span className="text-sm text-slate-600">
+                               {typeof order.factoryId === "object" ? order.factoryId.name : "—"}
+                             </span>
+                           </TableCell>
                           <TableCell className="text-center">
                             <Badge
                               variant="secondary"
@@ -437,6 +426,22 @@ export default function ProductionOrdersPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {canEdit && order.status === "pending" && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-emerald-600 hover:bg-emerald-50"
+                                      onClick={() => handleStartOrder(order._id)}
+                                    >
+                                      <Play className="w-4 h-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Bắt đầu sản xuất</TooltipContent>
+                                </Tooltip>
+                              )}
+
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button
@@ -507,12 +512,8 @@ export default function ProductionOrdersPage() {
             totalPages={pagination.totalPages}
             limit={pagination.limit}
             total={pagination.total}
-            onPageChange={(p: number) =>
-              setPagination((prev) => ({ ...prev, page: p }))
-            }
-            onLimitChange={(l: number) =>
-              setPagination((prev) => ({ ...prev, limit: l, page: 1 }))
-            }
+            onPageChange={(p: number) => setPage(p)}
+            onLimitChange={() => setPage(1)}
           />
         </>
       )}

@@ -32,6 +32,7 @@ export interface Factory {
   name: string;
   code: string;
   location?: string;
+  description?: string;
   active: boolean;
 }
 
@@ -53,7 +54,10 @@ export interface QualityControl {
 export interface VehicleType {
   _id: string;
   name: string;
+  code?: string;
   description?: string;
+  framePrefix?: string;
+  enginePrefix?: string;
   active: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -62,9 +66,11 @@ export interface VehicleType {
 export interface Process {
   _id: string;
   name: string;
+  code?: string;
   order: number;
   description?: string;
   active: boolean;
+  vehicleType?: string | VehicleType;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -72,8 +78,14 @@ export interface Process {
 export interface Operation {
   _id: string;
   name: string;
+  code?: string;
   process: string | Process;
+  processId?: string | Process;
   description?: string;
+  standardMinutes?: number;
+  maxWorkers?: number;
+  standardQuantity?: number;
+  difficulty?: string;
   active: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -82,6 +94,8 @@ export interface Operation {
 export type ProductionOrderStatus =
   | "draft"
   | "active"
+  | "in_progress"
+  | "pending"
   | "paused"
   | "completed"
   | "cancelled";
@@ -89,15 +103,47 @@ export type ProductionOrderStatus =
 export interface ProductionOrder {
   _id: string;
   name: string;
-  vehicleType: string | VehicleType;
+  orderCode?: string;
+  vehicleType?: string | VehicleType;
+  vehicleTypeId?: string | VehicleType;
+  factoryId?: string | Factory;
   quantity: number;
   status: ProductionOrderStatus;
   startDate?: string;
   endDate?: string;
+  expectedEndDate?: string;
+  actualEndDate?: string;
   completedQuantity?: number;
+  frameNumbers?: string[];
+  engineNumbers?: string[];
+  note?: string;
   notes?: string;
+  createdBy?: string | User;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface ProductionOrderReport {
+  order: ProductionOrder;
+  dailyReport: Record<string, Registration[]>;
+  workerSummary: Array<{
+    userId: string;
+    code: string;
+    name: string;
+    totalQuantity: number;
+    totalMinutes: number;
+    totalBonus: number;
+    totalPenalty: number;
+    operations: number;
+  }>;
+  statistics: {
+    totalRegistrations: number;
+    totalCompleted: number;
+    totalQuantityProduced: number;
+    totalWorkingMinutes: number;
+    totalBonus: number;
+    totalPenalty: number;
+  };
 }
 
 export interface ProductionStandard {
@@ -117,10 +163,13 @@ export type RegistrationStatus = "in_progress" | "completed" | "cancelled";
 
 export interface Registration {
   _id: string;
-  user: string | User;
+  user?: string | User;
+  worker?: string | User;
   productionOrder: string | ProductionOrder;
+  process?: string | Process;
   operation: string | Operation;
-  factoryId: string;
+  operationId?: string | Operation;
+  factoryId: string | Factory;
   status: RegistrationStatus;
   startTime: string;
   endTime?: string;
@@ -136,6 +185,7 @@ export interface Registration {
   adjustedExpectedQty?: number;
   isReplacement?: boolean;
   reassignedFrom?: string;
+  deviation?: number;
   notes?: string;
   createdAt?: string;
   updatedAt?: string;

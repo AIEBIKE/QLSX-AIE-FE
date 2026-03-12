@@ -1,11 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import { ArrowLeft, Printer, Loader2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery } from "@tanstack/react-query";
 import * as api from "../../services/api";
+import { ProductionOrderReport } from "../../types";
 
 const statusColors: Record<string, string> = {
   pending: "bg-slate-100 text-slate-600",
@@ -25,8 +27,6 @@ const statusLabels: Record<string, string> = {
 export default function ProductionOrderReportPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [report, setReport] = useState<any>(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
 
@@ -36,21 +36,14 @@ export default function ProductionOrderReportPage() {
     return () => window.removeEventListener("resize", h);
   }, []);
 
-  const loadReport = useCallback(async () => {
-    try {
-      setLoading(true);
+  const { data: report, isLoading: loading } = useQuery<ProductionOrderReport>({
+    queryKey: ["orderReport", id],
+    queryFn: async () => {
       const res = await api.getOrderReport(id || "");
-      setReport(res.data.data);
-    } catch (error) {
-      console.error("Lỗi tải báo cáo:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    loadReport();
-  }, [loadReport]);
+      return res.data.data;
+    },
+    enabled: !!id,
+  });
 
   const formatMinutes = (minutes: number) => {
     if (!minutes) return "0 phút";
@@ -107,7 +100,7 @@ export default function ProductionOrderReportPage() {
           >
             <div>
               <span className="text-slate-500">Loại xe:</span>{" "}
-              <strong>{order?.vehicleType?.name}</strong>
+              <strong>{typeof order?.vehicleType === "object" ? order.vehicleType.name : order?.vehicleType}</strong>
             </div>
             <div>
               <span className="text-slate-500">Số lượng:</span>{" "}
@@ -136,7 +129,7 @@ export default function ProductionOrderReportPage() {
             </div>
             <div>
               <span className="text-slate-500">Người tạo:</span>{" "}
-              <strong>{order?.createdBy?.name}</strong>
+              <strong>{typeof order?.createdBy === "object" ? order.createdBy.name : order?.createdBy}</strong>
             </div>
           </div>
         </CardContent>

@@ -48,15 +48,17 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as api from "../../services/api";
 import { Pagination } from "@/components/shared/Pagination";
+import {
+  useCreateProductionStandard,
+  useUpdateProductionStandard,
+  useDeleteProductionStandard,
+} from "@/hooks/useMutations";
 
 export default function ProductionStandardsPage() {
-  const [vehicleTypes, setVehicleTypes] = useState<any[]>([]);
   const [selectedVehicleType, setSelectedVehicleType] = useState<any>(null);
-  const [standards, setStandards] = useState<any[]>([]);
-  const [operations, setOperations] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -72,7 +74,6 @@ export default function ProductionStandardsPage() {
   const isSupervisor = roleCode === "SUPERVISOR" || roleCode === "supervisor";
   const canEdit = isFacManager && !isAdmin;
 
-  const [factories, setFactories] = useState<any[]>([]);
   const [selectedFactory, setSelectedFactory] = useState<string>("all");
 
   // Form state
@@ -92,38 +93,44 @@ export default function ProductionStandardsPage() {
     meta: { maxBonus: 0, maxPenalty: 0 },
   });
 
-  useEffect(() => {
-    const loadInitData = async () => {
-      setLoading(true);
-      try {
-        const [vtRes, fRes] = await Promise.all([
-          api.getVehicleTypes({ active: true, limit: 100 }),
-          isAdmin
-            ? api.getFactories()
-            : Promise.resolve({ data: { data: [] } }),
-        ]);
-        const types = (vtRes as any).data.data || [];
-        setVehicleTypes(types);
-        if (types.length > 0) setSelectedVehicleType(types[0]);
-        if (isAdmin) setFactories((fRes as any).data.data || []);
-      } catch {
-        toast.error("Lỗi tải dữ liệu ban đầu");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadInitData();
-  }, []);
+  const queryClient = useQueryClient();
 
+  const { data: initData, isLoading: loadingInit } = useQuery({
+    queryKey: ["standards_init", isAdmin],
+    queryFn: async () => {
+      const [vtRes, fRes] = await Promise.all([
+        api.getVehicleTypes({ active: true, limit: 100 }),
+        isAdmin
+          ? api.getFactories()
+          : Promise.resolve({ data: { data: [] } }),
+      ]);
+      return {
+        vehicleTypes: (vtRes as any).data.data || [],
+        factories: isAdmin ? (fRes as any).data.data || [] : [],
+      };
+    },
+  });
+
+  const vehicleTypes = initData?.vehicleTypes || [];
+  const factories = initData?.factories || [];
+
+  // Auto-select first vehicle type
   useEffect(() => {
-    if (selectedVehicleType) {
-      loadStandards();
-      loadOperationsForVehicleType();
+    if (vehicleTypes.length > 0 && !selectedVehicleType) {
+      setSelectedVehicleType(vehicleTypes[0]);
     }
-  }, [selectedVehicleType, selectedFactory, pagination.page, pagination.limit]);
+  }, [vehicleTypes]);
 
-  const loadStandards = async () => {
-    try {
+  const { data: standardsData, isLoading: loadingStandards } = useQuery({
+    queryKey: [
+      "standards",
+      selectedVehicleType?._id,
+      selectedFactory,
+      pagination.page,
+      pagination.limit,
+      searchTerm,
+    ],
+    queryFn: async () => {
       const query: any = {
         vehicleTypeId: selectedVehicleType._id,
         page: pagination.page,
@@ -134,24 +141,28 @@ export default function ProductionStandardsPage() {
         query.factoryId = selectedFactory;
       }
       const res = await api.getProductionStandards(query);
-      setStandards(res.data.data || []);
-      if (res.data.pagination) {
-        setPagination((prev) => ({
-          ...prev,
-          total: res.data.pagination.total,
-          totalPages: res.data.pagination.totalPages,
-          meta: res.data.meta || { maxBonus: 0, maxPenalty: 0 },
-        }));
-      }
-      setEditedStandards({});
-      setHasChanges(false);
-    } catch {
-      toast.error("Lỗi tải tiêu chuẩn");
-    }
-  };
+      return res.data;
+    },
+    enabled: !!selectedVehicleType,
+  });
 
-  const loadOperationsForVehicleType = async () => {
-    try {
+  const standards = standardsData?.data || [];
+  useEffect(() => {
+    if (standardsData?.pagination) {
+      setPagination((prev) => ({
+        ...prev,
+        total: standardsData.pagination.total,
+        totalPages: standardsData.pagination.totalPages,
+        meta: standardsData.meta || { maxBonus: 0, maxPenalty: 0 },
+      }));
+    }
+    setEditedStandards({});
+    setHasChanges(false);
+  }, [standardsData]);
+
+  const { data: operations = [] } = useQuery({
+    queryKey: ["standards_operations", selectedVehicleType?._id],
+    queryFn: async () => {
       const processRes = await api.getProcesses({
         vehicleTypeId: selectedVehicleType._id,
         limit: 100,
@@ -169,34 +180,37 @@ export default function ProductionStandardsPage() {
         }));
         allOperations = [...allOperations, ...ops];
       }
-      setOperations(allOperations);
-    } catch {
-      toast.error("Lỗi tải thao tác");
-    }
-  };
+      return allOperations;
+    },
+    enabled: !!selectedVehicleType,
+  });
 
-  const handleSubmit = async () => {
-    try {
-      const data = {
-        ...formData,
-        vehicleTypeId: selectedVehicleType._id,
-        expectedQuantity: Number(formData.expectedQuantity),
-        bonusPerUnit: Number(formData.bonusPerUnit) || 0,
-        penaltyPerUnit: Number(formData.penaltyPerUnit) || 0,
-      };
-      await api.createProductionStandard(data as any);
-      toast.success("Thêm thành công");
-      setModalOpen(false);
-      setFormData({
-        operationId: "",
-        expectedQuantity: 1,
-        bonusPerUnit: 0,
-        penaltyPerUnit: 0,
-      });
-      loadStandards();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
-    }
+  const loading = loadingInit || loadingStandards;
+
+  const createMutation = useCreateProductionStandard();
+  const updateMutation = useUpdateProductionStandard();
+  const deleteMutation = useDeleteProductionStandard();
+
+  const handleSubmit = () => {
+    const data = {
+      ...formData,
+      vehicleTypeId: selectedVehicleType._id,
+      expectedQuantity: Number(formData.expectedQuantity),
+      bonusPerUnit: Number(formData.bonusPerUnit) || 0,
+      penaltyPerUnit: Number(formData.penaltyPerUnit) || 0,
+    };
+    createMutation.mutate(data as any, {
+      onSuccess: () => {
+        setModalOpen(false);
+        setFormData({
+          operationId: "",
+          expectedQuantity: 1,
+          bonusPerUnit: 0,
+          penaltyPerUnit: 0,
+        });
+        queryClient.invalidateQueries({ queryKey: ["standards"] });
+      },
+    });
   };
 
   const handleInlineEdit = (standardId: string, field: string, value: any) => {
@@ -210,24 +224,22 @@ export default function ProductionStandardsPage() {
   const handleSaveChanges = async () => {
     try {
       const updates = Object.entries(editedStandards).map(([id, changes]) =>
-        api.updateProductionStandard(id, changes as any),
+        updateMutation.mutateAsync({ id, data: changes }),
       );
       await Promise.all(updates);
       toast.success("Lưu thành công!");
-      loadStandards();
+      queryClient.invalidateQueries({ queryKey: ["standards"] });
     } catch (err: any) {
       toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
     }
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      await api.deleteProductionStandard(id);
-      toast.success("Xóa thành công");
-      loadStandards();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
-    }
+  const handleDelete = (id: string) => {
+    deleteMutation.mutate(id, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["standards"] });
+      },
+    });
   };
 
   const formatCurrency = (value: number) =>
@@ -307,7 +319,7 @@ export default function ProductionStandardsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Tất cả nhà máy</SelectItem>
-                    {factories.map((f) => (
+                    {factories.map((f: any) => (
                       <SelectItem key={f._id} value={f._id}>
                         {f.name}
                       </SelectItem>
@@ -324,7 +336,7 @@ export default function ProductionStandardsPage() {
                 value={selectedVehicleType?._id || ""}
                 onValueChange={(v) =>
                   setSelectedVehicleType(
-                    vehicleTypes.find((vt) => vt._id === v),
+                    vehicleTypes.find((vt: any) => vt._id === v),
                   )
                 }
               >
@@ -332,7 +344,7 @@ export default function ProductionStandardsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {vehicleTypes.map((vt) => (
+                  {vehicleTypes.map((vt: any) => (
                     <SelectItem key={vt._id} value={vt._id}>
                       {vt.name} ({vt.code})
                     </SelectItem>
@@ -352,7 +364,13 @@ export default function ProductionStandardsPage() {
               />
             </div>
             <div className="ml-auto flex gap-3">
-              <Button variant="outline" onClick={loadStandards}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditedStandards({});
+                  setHasChanges(false);
+                }}
+              >
                 <RefreshCw className="w-4 h-4 mr-1" /> Đặt lại
               </Button>
               <Button
@@ -425,8 +443,12 @@ export default function ProductionStandardsPage() {
                     </td>
                   </tr>
                 ) : (
-                  standards.map((std) => {
-                    const tag = getProcessTag(std.operationId?.processId?.name);
+                  standards.map((std: any) => {
+                    const tag = getProcessTag(
+                      typeof std.operationId === "object"
+                        ? (std.operationId as any).processId?.name
+                        : "",
+                    );
                     const currentValues = editedStandards[std._id] || {};
                     return (
                       <tr
@@ -435,11 +457,16 @@ export default function ProductionStandardsPage() {
                       >
                         <td className="px-4 py-3">
                           <div className="font-medium">
-                            {std.operationId?.name}
+                            {typeof std.operationId === "object"
+                              ? std.operationId.name
+                              : std.operationId}
                           </div>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-xs text-slate-400">
-                              ID: {std.operationId?.code}
+                              ID:{" "}
+                              {typeof std.operationId === "object"
+                                ? std.operationId.code
+                                : ""}
                             </span>
                             <span
                               className={`${tag.bg} ${tag.color} px-2 py-0.5 rounded text-[10px] font-semibold`}
@@ -450,7 +477,9 @@ export default function ProductionStandardsPage() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="font-semibold text-[#0077c0] text-base">
-                            {std.operationId?.standardQuantity ||
+                            {(typeof std.operationId === "object"
+                              ? std.operationId.standardQuantity
+                              : 0) ||
                               std.expectedQuantity ||
                               "—"}
                           </div>
@@ -459,7 +488,10 @@ export default function ProductionStandardsPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center text-sm">
-                          {std.operationId?.standardMinutes?.toFixed(1) || "—"}p
+                          {(typeof std.operationId === "object"
+                            ? std.operationId.standardMinutes
+                            : 0)?.toFixed(1) || "—"}
+                          p
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center">

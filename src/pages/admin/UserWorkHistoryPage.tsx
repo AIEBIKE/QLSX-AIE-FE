@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import { ArrowLeft, Filter, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery } from "@tanstack/react-query";
 import * as api from "../../services/api";
 import { Pagination } from "@/components/shared/Pagination";
 
@@ -24,17 +25,11 @@ const statusLabels: Record<string, string> = {
 export default function UserWorkHistoryPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<any>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 1,
-  });
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768);
@@ -42,37 +37,30 @@ export default function UserWorkHistoryPage() {
     return () => window.removeEventListener("resize", h);
   }, []);
 
-  const loadHistory = useCallback(async () => {
-    try {
-      setLoading(true);
-      const params: any = {};
+  const { data: historyData, isLoading: loading } = useQuery({
+    queryKey: ["userWorkHistory", id, startDate, endDate, page, limit],
+    queryFn: async () => {
+      const params: any = { page, limit };
       if (startDate) params.startDate = new Date(startDate).toISOString();
       if (endDate) params.endDate = new Date(endDate).toISOString();
-      params.page = pagination.page;
-      params.limit = pagination.limit;
       const res = await api.getUserWorkHistory(id as string, params);
-      setData({
+      return {
         user: res.data.meta?.user,
         registrations: res.data.data,
         statistics: res.data.meta?.statistics,
-      });
-      if (res.data.pagination) {
-        setPagination((prev) => ({
-          ...prev,
-          total: res.data.pagination.total,
-          totalPages: res.data.pagination.totalPages,
-        }));
-      }
-    } catch (error) {
-      console.error("Lỗi tải lịch sử:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [id, startDate, endDate]);
+        pagination: res.data.pagination,
+      };
+    },
+    enabled: !!id,
+  });
 
-  useEffect(() => {
-    loadHistory();
-  }, [loadHistory, pagination.page, pagination.limit]);
+  const data = historyData || null;
+  const pagination = {
+    page,
+    limit,
+    total: historyData?.pagination?.total || 0,
+    totalPages: historyData?.pagination?.totalPages || 1,
+  };
 
   const formatMinutes = (minutes: number) => {
     if (!minutes) return "0 phút";
@@ -188,7 +176,7 @@ export default function UserWorkHistoryPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={loadHistory}
+            onClick={() => { setPage(1); }}
             disabled={loading}
           >
             <Filter className="w-3.5 h-3.5 mr-1" /> Lọc
@@ -359,12 +347,8 @@ export default function UserWorkHistoryPage() {
               totalPages={pagination.totalPages}
               limit={pagination.limit}
               total={pagination.total}
-              onPageChange={(p) =>
-                setPagination((prev) => ({ ...prev, page: p }))
-              }
-              onLimitChange={(l) =>
-                setPagination((prev) => ({ ...prev, limit: l, page: 1 }))
-              }
+              onPageChange={(p) => setPage(p)}
+              onLimitChange={() => setPage(1)}
             />
           </div>
         </Card>

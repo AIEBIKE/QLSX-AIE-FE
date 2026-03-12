@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import dayjs from "dayjs";
 import Cookies from "js-cookie";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle,
   UserPlus,
@@ -62,6 +63,9 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import * as api from "../../services/api";
+import { useProductionOrder, useOrderProgress, useUsers, useOperations } from "@/hooks/useQueries";
+import { useCompleteOrder, useAssignWorker, useReassignRegistration } from "@/hooks/useMutations";
+import { queryKeys } from "@/hooks/queryKeys";
 
 const getProcessIcon = (processName = "") => {
   const n = processName.toLowerCase();
@@ -105,15 +109,28 @@ export default function ProductionOrderDetailPage() {
   const isSupervisor = roleCode === "SUPERVISOR";
   const canEdit = isFacManager; // Only Fac Manager can CRUD Production Orders
 
-  const [loading, setLoading] = useState(true);
-  const [order, setOrder] = useState<any>(null);
-  const [progress, setProgress] = useState<any[]>([]);
-  const [registrations, setRegistrations] = useState<any[]>([]);
-  const [summary, setSummary] = useState<any>(null);
+  const queryClient = useQueryClient();
+
+  // ─── React Query: Fetch data ───────────────────────
+  const { data: order, isLoading: orderLoading } = useProductionOrder(id!);
+  const { data: progressData, isLoading: progressLoading } = useOrderProgress(id!);
+  const { data: usersData } = useUsers();
+  const { data: opsData } = useOperations();
+
+  const progress = (progressData as any)?.progress || [];
+  const registrations = (progressData as any)?.registrations || [];
+  const summary = (progressData as any)?.summary || null;
+  const users = usersData?.data || [];
+  const operations = opsData || [];
+  const loading = orderLoading || progressLoading;
+
+  // ─── React Query: Mutations ────────────────────────
+  const completeMutation = useCompleteOrder();
+  const assignMutation = useAssignWorker();
+  const reassignMutation = useReassignRegistration();
+
+  // ─── UI State ──────────────────────────────────────
   const [assignOpen, setAssignOpen] = useState(false);
-  const [assignLoading, setAssignLoading] = useState(false);
-  const [users, setUsers] = useState<any[]>([]);
-  const [operations, setOperations] = useState<any[]>([]);
   const [compCheck, setCompCheck] = useState<any>(null);
   const [forceOpen, setForceOpen] = useState(false);
   const [forceMsg, setForceMsg] = useState("");
@@ -122,7 +139,6 @@ export default function ProductionOrderDetailPage() {
   const [reassignOpen, setReassignOpen] = useState(false);
   const [selectedReg, setSelectedReg] = useState<any>(null);
   const [reassignUserId, setReassignUserId] = useState("");
-  const [reassignLoading, setReassignLoading] = useState(false);
   const [assignForm, setAssignForm] = useState({
     userId: "",
     operationId: "",
@@ -130,38 +146,10 @@ export default function ProductionOrderDetailPage() {
     replacementReason: "",
   });
 
-  const loadData = useCallback(async () => {
-    if (!id) return;
-    try {
-      setLoading(true);
-      const [oRes, pRes] = await Promise.all([
-        api.getProductionOrder(id),
-        api.getOrderProgress(id),
-      ]);
-      setOrder(oRes.data.data);
-      const progressData = pRes.data.data as any;
-      setProgress(progressData.progress);
-      setRegistrations(progressData.registrations || []);
-      setSummary(progressData.summary);
-    } catch (e: any) {
-      toast.error("Lỗi tải dữ liệu: " + e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  const loadUsersOps = async () => {
-    try {
-      const [uR, oR] = await Promise.all([api.getUsers(), api.getOperations()]);
-      setUsers(uR.data.data);
-      setOperations(oR.data.data);
-    } catch (e: any) {
-      toast.error("Lỗi: " + e.message);
-    }
+  // ─── Handlers ──────────────────────────────────────
+  const refreshAll = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.productionOrders.detail(id!) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.productionOrders.progress(id!) });
   };
 
   const handleCheckCompletion = async () => {
@@ -180,70 +168,76 @@ export default function ProductionOrderDetailPage() {
     }
   };
 
-  const handleComplete = async () => {
+  const handleComplete = () => {
     if (!id) return;
-    try {
-      await api.completeOrder(id, { forceComplete: false });
-      toast.success("Đã hoàn thành!");
-      loadData();
-    } catch (e: any) {
-      if (e.response?.data?.error?.code === "INCOMPLETE_PROCESSES") {
-        setForceMsg(e.response.data.error.message);
-        setForceOpen(true);
-      } else toast.error(e.response?.data?.error?.message || e.message);
-    }
+    completeMutation.mutate(
+      { id, data: { forceComplete: false } },
+      {
+        onError: (e: any) => {
+          if (e.response?.data?.error?.code === "INCOMPLETE_PROCESSES") {
+            setForceMsg(e.response.data.error.message);
+            setForceOpen(true);
+          } else toast.error(e.response?.data?.error?.message || e.message);
+        },
+      },
+    );
   };
 
-  const handleForce = async () => {
+  const handleForce = () => {
     if (!id) return;
-    await api.completeOrder(id, { forceComplete: true });
-    toast.success("Đã ép hoàn thành!");
-    setForceOpen(false);
-    loadData();
+    completeMutation.mutate(
+      { id, data: { forceComplete: true } },
+      {
+        onSuccess: () => {
+          setForceOpen(false);
+        },
+      },
+    );
   };
 
-  const handleAssign = async () => {
+  const handleAssign = () => {
     if (!id) return;
-    try {
-      setAssignLoading(true);
-      await api.assignWorkerToOrder(id, {
-        ...(assignForm as any),
-        expectedQuantity: Number(assignForm.expectedQuantity),
-      });
-      toast.success("Đã bổ sung!");
-      setAssignOpen(false);
-      setAssignForm({
-        userId: "",
-        operationId: "",
-        expectedQuantity: 1,
-        replacementReason: "",
-      });
-      loadData();
-    } catch (e: any) {
-      toast.error(e.response?.data?.error?.message || e.message);
-    } finally {
-      setAssignLoading(false);
-    }
+    assignMutation.mutate(
+      {
+        id,
+        data: {
+          ...assignForm,
+          expectedQuantity: Number(assignForm.expectedQuantity),
+        },
+      },
+      {
+        onSuccess: () => {
+          setAssignOpen(false);
+          setAssignForm({
+            userId: "",
+            operationId: "",
+            expectedQuantity: 1,
+            replacementReason: "",
+          });
+        },
+      },
+    );
   };
 
-  const handleReassign = async () => {
+  const handleReassign = () => {
     if (!selectedReg || !reassignUserId) return;
-    try {
-      setReassignLoading(true);
-      await api.reassignRegistration(selectedReg._id, {
-        newUserId: reassignUserId,
-        note: "Thay thế do nghỉ đột xuất",
-      });
-      toast.success("Đã thay thế công nhân!");
-      setReassignOpen(false);
-      setSelectedReg(null);
-      setReassignUserId("");
-      loadData();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Lỗi khi thay thế");
-    } finally {
-      setReassignLoading(false);
-    }
+    reassignMutation.mutate(
+      {
+        id: selectedReg._id,
+        data: {
+          newUserId: reassignUserId,
+          note: "Thay thế do nghỉ đột xuất",
+        },
+      },
+      {
+        onSuccess: () => {
+          setReassignOpen(false);
+          setSelectedReg(null);
+          setReassignUserId("");
+          refreshAll();
+        },
+      },
+    );
   };
 
   if (loading)
@@ -253,8 +247,8 @@ export default function ProductionOrderDetailPage() {
       </div>
     );
 
-  const totalW = progress.reduce((s, p) => s + p.workers.length, 0);
-  const done = progress.reduce((s, p) => s + p.completed, 0);
+  const totalW = progress.reduce((s: number, p: any) => s + p.workers.length, 0);
+  const done = progress.reduce((s: number, p: any) => s + p.completed, 0);
   const pct = summary?.overallPercentage || 0;
 
   return (
@@ -285,13 +279,13 @@ export default function ProductionOrderDetailPage() {
                 <h2 className="text-2xl font-bold">Lệnh #{order?.orderCode}</h2>
                 <Badge
                   variant="outline"
-                  className={statusMap[order?.status]?.cls || ""}
+                  className={order?.status ? statusMap[order.status]?.cls || "" : ""}
                 >
-                  {statusMap[order?.status]?.label || order?.status}
+                  {order?.status ? statusMap[order.status]?.label || order.status : ""}
                 </Badge>
               </div>
               <p className="text-sm text-slate-500">
-                {order?.vehicleTypeId?.name} • {order?.vehicleTypeId?.code}
+                {typeof order?.vehicleTypeId === "object" ? order.vehicleTypeId.name : (order?.vehicleType as any)?.name} • {typeof order?.vehicleTypeId === "object" ? order.vehicleTypeId.code : (order?.vehicleType as any)?.code}
                 {order?.factoryId && (
                   <span className="block text-[#0077c0] font-medium mt-1">
                     🏭 Nhà máy:{" "}
@@ -390,12 +384,9 @@ export default function ProductionOrderDetailPage() {
         <CardContent className="pt-6">
           <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
             <h3 className="text-lg font-bold">Tiến độ công đoạn</h3>
-            {canEdit && order?.status === "in_progress" && (
+            {canEdit && (order as any)?.status === "in_progress" && (
               <Button
-                onClick={() => {
-                  loadUsersOps();
-                  setAssignOpen(true);
-                }}
+                onClick={() => setAssignOpen(true)}
                 className="bg-[#0077c0] hover:bg-[#005fa3]"
               >
                 <UserPlus className="w-4 h-4 mr-1" /> Bổ sung CN
@@ -431,7 +422,7 @@ export default function ProductionOrderDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {progress.map((r) => {
+                {progress.map((r: any) => {
                   const ic = getIconColor(r.processName);
                   const st = statusMap[r.status] || {
                     cls: "",
@@ -646,11 +637,6 @@ export default function ProductionOrderDetailPage() {
                                                               e,
                                                             ) => {
                                                               e.stopPropagation();
-                                                              if (
-                                                                users.length ===
-                                                                0
-                                                              )
-                                                                await loadUsersOps();
                                                               const actualOpId =
                                                                 regs[0]
                                                                   ?.operation
@@ -862,12 +848,58 @@ export default function ProductionOrderDetailPage() {
               </tbody>
             </table>
           </div>
-          {order?.status === "in_progress" && (
+          {canEdit && order?.status !== "completed" && (
             <div className="flex gap-3 mt-5 pt-5 border-t">
-              <Button variant="outline" onClick={loadData}>
+              <Button variant="outline" onClick={refreshAll}>
                 <RefreshCw className="w-4 h-4 mr-1" /> Làm mới
               </Button>
-              {canEdit && (
+
+              {/* Nút Bắt đầu - chuyển pending → in_progress */}
+              {order?.status === "pending" && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button className="bg-[#0077c0] hover:bg-[#005fa3]">
+                      <Zap className="w-4 h-4 mr-1" /> Bắt đầu
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        Bắt đầu lệnh sản xuất?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Lệnh sẽ chuyển sang trạng thái "Đang thực hiện". Công
+                        nhân có thể đăng ký thao tác.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Hủy</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-[#0077c0]"
+                        onClick={async () => {
+                          try {
+                            await api.updateProductionOrderStatus(
+                              id!,
+                              "in_progress",
+                            );
+                            toast.success("Đã bắt đầu lệnh sản xuất!");
+                            loadData();
+                          } catch (e: any) {
+                            toast.error(
+                              e.response?.data?.error?.message || e.message,
+                            );
+                          }
+                        }}
+                      >
+                        Bắt đầu
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+
+              {/* Nút Hoàn thành - khi đang in_progress */}
+              {order?.status === "in_progress" && (
                 <>
                   <Button variant="outline" onClick={handleCheckCompletion}>
                     <AlertTriangle className="w-4 h-4 mr-1" /> Kiểm tra
@@ -936,7 +968,7 @@ export default function ProductionOrderDetailPage() {
                     </td>
                   </tr>
                 ) : (
-                  registrations.map((reg) => (
+                  registrations.map((reg: any) => (
                     <tr
                       key={reg._id}
                       className="border-b border-slate-100 hover:bg-slate-50"
@@ -971,7 +1003,6 @@ export default function ProductionOrderDetailPage() {
                             onClick={() => {
                               setSelectedReg(reg);
                               setReassignOpen(true);
-                              loadUsersOps();
                             }}
                           >
                             <RefreshCw className="w-3.5 h-3.5 mr-1" /> Thay thế
@@ -1131,10 +1162,10 @@ export default function ProductionOrderDetailPage() {
             </Button>
             <Button
               onClick={handleAssign}
-              disabled={assignLoading}
+              disabled={assignMutation.isPending}
               className="bg-[#0077c0] hover:bg-[#005fa3]"
             >
-              {assignLoading && (
+              {assignMutation.isPending && (
                 <Loader2 className="w-4 h-4 animate-spin mr-1" />
               )}
               Bổ sung
@@ -1203,10 +1234,10 @@ export default function ProductionOrderDetailPage() {
             </Button>
             <Button
               onClick={handleReassign}
-              disabled={reassignLoading || !reassignUserId}
+              disabled={reassignMutation.isPending || !reassignUserId}
               className="bg-amber-600 hover:bg-amber-700 text-white"
             >
-              {reassignLoading && (
+              {reassignMutation.isPending && (
                 <Loader2 className="w-4 h-4 animate-spin mr-1" />
               )}
               Xác nhận thay thế

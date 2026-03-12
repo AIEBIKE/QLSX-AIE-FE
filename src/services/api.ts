@@ -14,6 +14,7 @@ import type {
   LoginResponse,
   Factory,
   QualityControl,
+  ProductionOrderReport, // Added ProductionOrderReport type
 } from "../types";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api";
@@ -195,9 +196,13 @@ export const registerOperation = (
   operationId: string,
 ): Promise<AxiosResponse<ApiResponse<Registration>>> =>
   api.post("/registrations", { operationId });
+export const startRegistration = (
+  id: string,
+): Promise<AxiosResponse<ApiResponse<Registration>>> =>
+  api.put(`/registrations/${id}/start`);
 export const completeRegistration = (
   id: string,
-  data: { quantity: number; notes?: string },
+  data: { actualQuantity: number; interruptionNote?: string; interruptionMinutes?: number },
 ): Promise<AxiosResponse<ApiResponse<Registration>>> =>
   api.put(`/registrations/${id}/complete`, data);
 export const cancelRegistration = (
@@ -224,15 +229,15 @@ export const reassignWorker = (data: {
 // Production Order - Progress & Reports
 export const getOrderProgress = (
   id: string,
-): Promise<AxiosResponse<ApiResponse<unknown>>> =>
+): Promise<AxiosResponse<ApiResponse<any>>> =>
   api.get(`/production-orders/${id}/progress`);
 export const getOrderReport = (
   id: string,
-): Promise<AxiosResponse<ApiResponse<unknown>>> =>
+): Promise<AxiosResponse<ApiResponse<ProductionOrderReport>>> =>
   api.get(`/production-orders/${id}/report`);
 export const checkOrderCompletion = (
   id: string,
-): Promise<AxiosResponse<ApiResponse<unknown>>> =>
+): Promise<AxiosResponse<ApiResponse<any>>> =>
   api.get(`/production-orders/${id}/check-completion`);
 export const completeOrder = (
   id: string,

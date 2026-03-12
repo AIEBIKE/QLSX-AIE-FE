@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "../../services/api";
 
 export default function QCInspectionPage() {
@@ -31,16 +32,14 @@ export default function QCInspectionPage() {
   const queryParams = new URLSearchParams(location.search);
   const orderIdFromQuery = queryParams.get("orderId");
 
+  const queryClient = useQueryClient();
+
   const [frameNumber, setFrameNumber] = useState("");
   const [engineNumber, setEngineNumber] = useState("");
   const [color, setColor] = useState("");
-  const [activeOrder, setActiveOrder] = useState<any>(null);
-  const [operations, setOperations] = useState<any[]>([]);
   const [results, setResults] = useState<
     Record<string, { status: "pass" | "fail"; note?: string }>
   >({});
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [framePrefix, setFramePrefix] = useState("");
   const [enginePrefix, setEnginePrefix] = useState("");
   const [autoIndex, setAutoIndex] = useState(1);
@@ -50,39 +49,35 @@ export default function QCInspectionPage() {
   const roleCode = user.roleCode || user.role;
   const isSupervisor = roleCode === "SUPERVISOR";
 
-  useEffect(() => {
-    if (orderIdFromQuery) {
-      loadOrder(orderIdFromQuery);
-    }
-  }, [orderIdFromQuery]);
-
-  const loadOrder = async (id: string) => {
-    setLoading(true);
-    try {
-      const res = await api.getProductionOrder(id);
-      setActiveOrder(res.data.data);
-
-      // Get operations for this vehicle type
+  const { data: orderData, isLoading: loading } = useQuery({
+    queryKey: ["qcOrder", orderIdFromQuery],
+    queryFn: async () => {
+      const res = await api.getProductionOrder(orderIdFromQuery!);
+      const order = res.data.data;
       const vTypeId =
-        typeof res.data.data.vehicleType === "object"
-          ? (res.data.data.vehicleType as any)._id
-          : res.data.data.vehicleType;
-
+        typeof order.vehicleType === "object"
+          ? (order.vehicleType as any)._id
+          : order.vehicleType;
       const opRes = await api.getOperations({ vehicleTypeId: vTypeId });
-      setOperations(opRes.data.data);
+      const ops = opRes.data.data;
+      return { order, operations: ops };
+    },
+    enabled: !!orderIdFromQuery,
+  });
 
-      // Initialize results
+  const activeOrder = orderData?.order || null;
+  const operations = orderData?.operations || [];
+
+  // Initialize results when operations change
+  useEffect(() => {
+    if (operations.length > 0 && Object.keys(results).length === 0) {
       const initialResults: any = {};
-      opRes.data.data.forEach((op: any) => {
+      operations.forEach((op: any) => {
         initialResults[op._id] = { status: "pass", note: "" };
       });
       setResults(initialResults);
-    } catch (err) {
-      toast.error("Không thể tải thông tin lệnh sản xuất");
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [operations]);
 
   const handleStatusChange = (opId: string, status: "pass" | "fail") => {
     setResults((prev) => ({
@@ -98,27 +93,11 @@ export default function QCInspectionPage() {
     }));
   };
 
-  const handleSubmit = async () => {
-    if (!frameNumber) {
-      toast.error("Vui lòng nhập số khung");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const payload = {
-        frameNumber,
-        engineNumber,
-        color,
-        results: Object.entries(results).map(([opId, data]) => ({
-          operationId: opId,
-          status: data.status,
-          note: data.note,
-        })),
-      };
-
-      await api.inspectVehicle(payload);
+  const inspectMutation = useMutation({
+    mutationFn: (payload: any) => api.inspectVehicle(payload),
+    onSuccess: () => {
       toast.success("Đã lưu kết quả kiểm tra!");
+      queryClient.invalidateQueries({ queryKey: ["qc"] });
       // Auto-increment for next vehicle
       setAutoIndex((prev) => prev + 1);
       if (framePrefix) {
@@ -136,11 +115,27 @@ export default function QCInspectionPage() {
         setEngineNumber("");
       }
       setColor("");
-    } catch (err: any) {
+    },
+    onError: (err: any) => {
       toast.error(err.response?.data?.error?.message || "Lỗi khi lưu kết quả");
-    } finally {
-      setSaving(false);
+    },
+  });
+
+  const handleSubmit = () => {
+    if (!frameNumber) {
+      toast.error("Vui lòng nhập số khung");
+      return;
     }
+    inspectMutation.mutate({
+      frameNumber,
+      engineNumber,
+      color,
+      results: Object.entries(results).map(([opId, data]) => ({
+        operationId: opId,
+        status: data.status,
+        note: data.note,
+      })),
+    });
   };
 
   if (loading)
@@ -289,7 +284,9 @@ export default function QCInspectionPage() {
                     <div className="flex-1">
                       <div className="font-semibold">{op.name}</div>
                       <div className="text-xs text-slate-500">
-                        {op.processId?.name}
+                        {typeof op.process === "object" 
+                          ? op.process.name 
+                          : (op as any).processId?.name}
                       </div>
                     </div>
 
@@ -346,9 +343,9 @@ export default function QCInspectionPage() {
               <Button
                 className="bg-[#0077c0] hover:bg-[#005f9e]"
                 onClick={handleSubmit}
-                disabled={saving}
+                disabled={inspectMutation.isPending}
               >
-                {saving ? (
+                {inspectMutation.isPending ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
                   <Save className="w-4 h-4 mr-2" />

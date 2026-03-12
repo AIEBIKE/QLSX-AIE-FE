@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowUp,
@@ -14,38 +14,32 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "../../contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
 import * as api from "../../services/api";
 import dayjs from "dayjs";
 
 export default function SalaryPage() {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(dayjs().format("YYYY-MM"));
-  const [salaryData, setSalaryData] = useState<any>(null);
-  const [dailyBreakdown, setDailyBreakdown] = useState<any[]>([]);
 
-  useEffect(() => {
-    loadSalaryData();
-  }, [selectedMonth]);
-
-  const loadSalaryData = async () => {
-    try {
-      setLoading(true);
+  const { data: salaryResult, isLoading: loading } = useQuery({
+    queryKey: ["workerSalary", selectedMonth],
+    queryFn: async () => {
       const d = dayjs(selectedMonth);
       const month = d.month() + 1;
       const year = d.year();
       const res = await api.getWorkerSalary({ month, year });
       const data: any = res.data.data;
-      setSalaryData(data?.summary || null);
-      setDailyBreakdown(data?.dailyDetails || []);
-    } catch (err) {
-      console.error(err);
-      setSalaryData(null);
-      setDailyBreakdown([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return {
+        summary: data?.summary || null,
+        dailyDetails: data?.dailyDetails || [],
+      };
+    },
+    staleTime: 30_000,
+  });
+
+  const salaryData = salaryResult?.summary || null;
+  const dailyBreakdown = salaryResult?.dailyDetails || [];
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("vi-VN").format(value || 0);

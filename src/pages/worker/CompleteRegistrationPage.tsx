@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -10,27 +10,39 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "../../services/api";
+import { Registration } from "../../types";
 
 export default function CompleteRegistrationPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [registration, setRegistration] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const queryClient = useQueryClient();
   const [actualQuantity, setActualQuantity] = useState<number | null>(null);
   const [interruptionMinutes, setInterruptionMinutes] = useState(0);
   const [interruptionNote, setInterruptionNote] = useState("");
 
-  useEffect(() => {
-    loadRegistration();
-  }, [id]);
-
-  const loadRegistration = async () => {
-    try {
+  const { data: registration, isLoading: loading } = useQuery<Registration | null>({
+    queryKey: ["registration", id],
+    queryFn: async () => {
       const res = await api.getTodayRegistrations();
       const reg = res.data.data?.find((r: any) => r._id === id);
       if (reg) {
+        // If already completed, redirect back
+        if (reg.status === "completed") {
+          toast.info("Đăng ký này đã hoàn thành");
+          navigate("/worker");
+          return;
+        }
+        // If still registered, auto-start it
+        if (reg.status === "registered") {
+          try {
+            await api.startRegistration(id || "");
+            reg.status = "in_progress";
+          } catch (err: any) {
+            console.error("Auto-start failed:", err);
+          }
+        }
         setRegistration(reg);
         if (reg.actualQuantity !== null && reg.actualQuantity !== undefined) {
           setActualQuantity(reg.actualQuantity);
@@ -38,29 +50,32 @@ export default function CompleteRegistrationPage() {
           setInterruptionMinutes(reg.interruptionMinutes || 0);
         }
       }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return (reg as Registration) || null;
+    },
+    enabled: !!id,
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (submitting || actualQuantity === null) return;
-    setSubmitting(true);
-    try {
-      await api.completeRegistration(id || "", {
-        quantity: actualQuantity,
+  const submitMutation = useMutation({
+    mutationFn: () =>
+      api.completeRegistration(id || "", {
+        quantity: actualQuantity!,
         interruptionNote: interruptionNote || "",
         interruptionMinutes: interruptionMinutes || 0,
-      } as any);
+      } as any),
+    onSuccess: () => {
       toast.success("Đã lưu thành công!");
+      queryClient.invalidateQueries({ queryKey: ["workerDashboard"] });
       navigate("/worker");
-    } catch (err: any) {
+    },
+    onError: (err: any) => {
       toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
-      setSubmitting(false);
-    }
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (submitMutation.isPending || actualQuantity === null) return;
+    submitMutation.mutate();
   };
 
   const calculateResult = () => {
@@ -112,10 +127,14 @@ export default function CompleteRegistrationPage() {
         <CardContent className="pt-5">
           <p className="text-sm text-slate-500">Thao tác</p>
           <h3 className="text-xl font-bold mt-1 mb-1">
-            {registration.operationId?.name}
+            {typeof registration.operationId === "object"
+              ? registration.operationId.name
+              : registration.operationId}
           </h3>
           <p className="text-sm text-slate-400">
-            {registration.operationId?.code}
+            {typeof registration.operationId === "object"
+              ? registration.operationId.code
+              : ""}
           </p>
           <div className="mt-4 p-4 bg-blue-50 rounded-lg text-center">
             <p className="text-sm text-slate-500">Sản lượng quy định</p>
@@ -229,10 +248,10 @@ export default function CompleteRegistrationPage() {
 
             <Button
               type="submit"
-              disabled={submitting || actualQuantity === null}
+              disabled={submitMutation.isPending || actualQuantity === null}
               className="w-full h-[50px] text-base bg-emerald-500 hover:bg-emerald-600"
             >
-              {submitting ? (
+              {submitMutation.isPending ? (
                 <Loader2 className="w-5 h-5 animate-spin mr-2" />
               ) : (
                 <CheckCircle className="w-5 h-5 mr-2" />
