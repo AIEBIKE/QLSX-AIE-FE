@@ -23,6 +23,7 @@ import {
   CreditCard,
   Building2,
   ShieldCheck,
+  ClipboardList,
   AlertTriangle,
   ExternalLink,
 } from "lucide-react";
@@ -99,9 +100,9 @@ const menuItems: MenuItem[] = [
     label: "Đăng ký công",
   },
   {
-    key: "/admin/qc",
-    icon: <ShieldCheck className="w-4 h-4" />,
-    label: "Kiểm tra QC",
+    key: "/admin/qc/list",
+    icon: <ClipboardList className="w-4 h-4" />,
+    label: "Phiếu kiểm duyệt QC",
   },
   {
     key: "/admin/salary-summary",
@@ -277,7 +278,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 "/admin/processes",
                 "/admin/orders",
                 "/admin/standards",
-                "/admin/qc",
+                "/admin/qc/list",
                 "/admin/registrations", // Thêm đăng ký công cho GS
               ];
               return supervisorIncluded.includes(item.key);
