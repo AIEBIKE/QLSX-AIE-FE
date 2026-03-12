@@ -252,8 +252,18 @@ export const useQCReport = (orderId: string) =>
   useQuery({
     queryKey: queryKeys.qc.report(orderId),
     queryFn: async () => {
-      const res = await api.getQCReport(orderId);
+      const res = await api.getQCByOrderId(orderId);
       return res.data.data;
     },
     enabled: !!orderId,
   });
+
+export const useQCList = (params?: Record<string, unknown>) =>
+  useQuery({
+    queryKey: ["qcList", params],
+    queryFn: async () => {
+      const res = await api.getQCList(params);
+      return res.data;
+    },
+  });
+

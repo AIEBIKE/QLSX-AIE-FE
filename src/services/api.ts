@@ -326,10 +326,20 @@ export const deleteFactory = (id: string): Promise<AxiosResponse<ApiResponse<nul
 // Quality Control (QC)
 export const inspectVehicle = (data: any): Promise<AxiosResponse<ApiResponse<QualityControl>>> =>
   api.post("/qc/inspect", data);
-export const getQCReport = (orderId: string): Promise<AxiosResponse<ApiResponse<QualityControl[]>>> =>
-  api.get(`/qc/order/${orderId}`);
-export const getVehicleQC = (frameNumber: string): Promise<AxiosResponse<ApiResponse<QualityControl>>> =>
-  api.get(`/qc/vehicle/${frameNumber}`);
+export const getQCList = (params?: Record<string, unknown>): Promise<AxiosResponse<any>> =>
+  api.get("/qc/list", { params });
+export const getQCDetail = (id: string): Promise<AxiosResponse<ApiResponse<QualityControl>>> =>
+  api.get(`/qc/${id}`);
+export const updateQC = (id: string, data: any): Promise<AxiosResponse<ApiResponse<QualityControl>>> =>
+  api.put(`/qc/${id}`, data);
+export const getQCByOrderId = (orderId: string): Promise<AxiosResponse<ApiResponse<QualityControl[]>>> =>
+  api.get(`/qc/report/${orderId}`);
+export const getVehicleQC = (params: Record<string, string>): Promise<AxiosResponse<ApiResponse<QualityControl>>> =>
+  api.get("/qc/vehicle", { params });
+export const completeQC = (id: string): Promise<AxiosResponse<ApiResponse<QualityControl>>> =>
+  api.put(`/qc/${id}/complete`);
+export const completeAllQC = (data?: { productionOrderId?: string }): Promise<AxiosResponse<any>> =>
+  api.post("/qc/complete-all", data || {});
 
 // Reassign (Supervisor only)
 export const reassignRegistration = (id: string, data: { newUserId: string; note?: string }): Promise<AxiosResponse<ApiResponse<Registration>>> =>

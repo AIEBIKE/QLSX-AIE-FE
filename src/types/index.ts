@@ -36,19 +36,27 @@ export interface Factory {
   active: boolean;
 }
 
+export interface QCResult {
+  operationId: string;
+  operationName?: string;
+  processId?: string;
+  processName?: string;
+  status: "pass" | "fail";
+  note?: string;
+}
+
 export interface QualityControl {
   _id: string;
-  productionOrderId: string;
+  productionOrderId: string | ProductionOrder;
   frameNumber: string;
   engineNumber: string;
+  color?: string;
   inspectionDate: string;
-  inspectorId: string;
-  results: Array<{
-    operationId: string;
-    status: "pass" | "fail";
-    note?: string;
-  }>;
-  status: "passed" | "failed";
+  inspectorId: string | User;
+  results: QCResult[];
+  status: "pending" | "passed" | "failed";
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface VehicleType {

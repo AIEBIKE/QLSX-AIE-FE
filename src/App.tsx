@@ -42,6 +42,8 @@ import UserWorkHistoryPage from "./pages/admin/UserWorkHistoryPage";
 import AdminSalarySummaryPage from "./pages/admin/AdminSalarySummaryPage";
 import FactoryManagementPage from "./pages/admin/FactoryManagementPage";
 import QCInspectionPage from "./pages/supervisor/QCInspectionPage";
+import QCListPage from "./pages/supervisor/QCListPage";
+import QCEditPage from "./pages/supervisor/QCEditPage";
 
 // Shared Pages
 import AccountPage from "./pages/shared/AccountPage";
@@ -304,6 +306,22 @@ function App() {
             element={
               <AdminRoute>
                 <QCInspectionPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/qc/list"
+            element={
+              <AdminRoute>
+                <QCListPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/qc/:id/edit"
+            element={
+              <AdminRoute>
+                <QCEditPage />
               </AdminRoute>
             }
           />
