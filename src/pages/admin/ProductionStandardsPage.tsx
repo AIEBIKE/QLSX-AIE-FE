@@ -72,9 +72,11 @@ export default function ProductionStandardsPage() {
   const isAdmin = roleCode === "ADMIN" || roleCode === "admin";
   const isFacManager = roleCode === "FAC_MANAGER" || roleCode === "fac_manager";
   const isSupervisor = roleCode === "SUPERVISOR" || roleCode === "supervisor";
-  const canEdit = isFacManager && !isAdmin;
+  const canEdit = isFacManager || isAdmin;
 
-  const [selectedFactory, setSelectedFactory] = useState<string>("all");
+  const [selectedFactory, setSelectedFactory] = useState<string>(
+    user.factoryId || ""
+  );
 
   // Form state
   const [formData, setFormData] = useState({
@@ -136,10 +138,8 @@ export default function ProductionStandardsPage() {
         page: pagination.page,
         limit: pagination.limit,
         search: searchTerm || undefined,
+        factoryId: selectedFactory || undefined,
       };
-      if (selectedFactory !== "all") {
-        query.factoryId = selectedFactory;
-      }
       const res = await api.getProductionStandards(query);
       return res.data;
     },
@@ -223,10 +223,43 @@ export default function ProductionStandardsPage() {
 
   const handleSaveChanges = async () => {
     try {
-      const updates = Object.entries(editedStandards).map(([id, changes]) =>
-        updateMutation.mutateAsync({ id, data: changes }),
-      );
-      await Promise.all(updates);
+      // Separate override changes (bonus/penalty) from standard changes (expectedQuantity)
+      const overrideEntries: Array<{ standardId: string; bonusPerUnit: number; penaltyPerUnit: number }> = [];
+      const standardUpdates: Array<{ id: string; data: any }> = [];
+
+      for (const [id, changes] of Object.entries(editedStandards)) {
+        const { bonusPerUnit, penaltyPerUnit, ...stdChanges } = changes as any;
+        // bonus/penalty edits go to factory overrides
+        if (bonusPerUnit !== undefined || penaltyPerUnit !== undefined) {
+          const std = standards.find((s: any) => s._id === id);
+          overrideEntries.push({
+            standardId: id,
+            bonusPerUnit: bonusPerUnit ?? std?.bonusPerUnit ?? 0,
+            penaltyPerUnit: penaltyPerUnit ?? std?.penaltyPerUnit ?? 0,
+          });
+        }
+        // Other changes (expectedQuantity) go to standard update
+        if (Object.keys(stdChanges).length > 0) {
+          standardUpdates.push({ id, data: stdChanges });
+        }
+      }
+
+      const promises: Promise<any>[] = [];
+
+      if (overrideEntries.length > 0) {
+        promises.push(
+          api.batchUpsertStandardOverrides({
+            overrides: overrideEntries,
+            factoryId: selectedFactory || undefined,
+          })
+        );
+      }
+
+      for (const { id, data } of standardUpdates) {
+        promises.push(updateMutation.mutateAsync({ id, data }));
+      }
+
+      await Promise.all(promises);
       toast.success("Lưu thành công!");
       queryClient.invalidateQueries({ queryKey: ["standards"] });
     } catch (err: any) {
@@ -305,20 +338,19 @@ export default function ProductionStandardsPage() {
       <Card className="mb-6 border-slate-200">
         <CardContent className="pt-5">
           <div className="flex gap-4 items-end flex-wrap">
-            {isAdmin && (
-              <div>
-                <Label className="text-[11px] uppercase text-slate-500 mb-1 block">
-                  Nhà máy
-                </Label>
+            <div>
+              <Label className="text-[11px] uppercase text-slate-500 mb-1 block">
+                Nhà máy (thưởng/phạt)
+              </Label>
+              {isAdmin ? (
                 <Select
                   value={selectedFactory}
                   onValueChange={setSelectedFactory}
                 >
                   <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Tất cả nhà máy" />
+                    <SelectValue placeholder="Chọn nhà máy" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Tất cả nhà máy</SelectItem>
                     {factories.map((f: any) => (
                       <SelectItem key={f._id} value={f._id}>
                         {f.name}
@@ -326,8 +358,12 @@ export default function ProductionStandardsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            )}
+              ) : (
+                <div className="h-9 px-3 flex items-center rounded-md border border-slate-200 bg-slate-50 text-sm text-slate-600 w-[200px]">
+                  {user.factoryName || "Nhà máy của bạn"}
+                </div>
+              )}
+            </div>
             <div>
               <Label className="text-[11px] uppercase text-slate-500 mb-1 block">
                 Loại xe
