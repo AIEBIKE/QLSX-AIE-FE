@@ -431,7 +431,7 @@ export const useInspectVehicle = () => {
     mutationFn: (data: any) => api.inspectVehicle(data),
     onSuccess: () => {
       toast.success("Kiểm tra thành công");
-      qc.invalidateQueries({ queryKey: queryKeys.qc.list() }); // [splinh-12/03-14:21]
+      qc.invalidateQueries({ queryKey: ["qc", "list"], exact: false }); // [splinh-12/03-14:21]
     },
     onError: (err: any) => toast.error(getErrMsg(err, "Lỗi kiểm tra")),
   });
@@ -454,9 +454,10 @@ export const useCompleteQC = () => { // [splinh-12/03-14:21]
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.completeQC(id),
-    onSuccess: () => {
+    onSuccess: (_res, id) => {
       toast.success("Đã hoàn thành phiếu!");
-      qc.invalidateQueries({ queryKey: queryKeys.qc.list() });
+      qc.invalidateQueries({ queryKey: ["qc", "list"], exact: false });
+      qc.invalidateQueries({ queryKey: queryKeys.qc.detail(id) });
     },
     onError: (err: any) => toast.error(getErrMsg(err, "Lỗi hoàn thành")),
   });
@@ -469,7 +470,7 @@ export const useCompleteAllQC = () => { // [splinh-12/03-14:21]
     onSuccess: (res) => {
       const count = res.data?.data?.length || 0;
       toast.success(`Đã hoàn thành ${count} phiếu!`);
-      qc.invalidateQueries({ queryKey: queryKeys.qc.list() });
+      qc.invalidateQueries({ queryKey: ["qc", "list"], exact: false });
     },
     onError: (err: any) => toast.error(getErrMsg(err, "Lỗi hoàn thành tất cả")),
   });

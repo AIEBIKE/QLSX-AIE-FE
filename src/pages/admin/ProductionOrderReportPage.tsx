@@ -92,7 +92,7 @@ export default function ProductionOrderReportPage() {
           >
             <div>
               <span className="text-slate-500">Loại xe:</span>{" "}
-              <strong>{typeof order?.vehicleType === "object" ? order.vehicleType.name : order?.vehicleType}</strong>
+              <strong>{order?.vehicleType && typeof order.vehicleType === "object" ? (order.vehicleType as any).name : order?.vehicleType}</strong>
             </div>
             <div>
               <span className="text-slate-500">Số lượng:</span>{" "}
@@ -121,7 +121,7 @@ export default function ProductionOrderReportPage() {
             </div>
             <div>
               <span className="text-slate-500">Người tạo:</span>{" "}
-              <strong>{typeof order?.createdBy === "object" ? order.createdBy.name : order?.createdBy}</strong>
+              <strong>{order?.createdBy && typeof order.createdBy === "object" ? (order.createdBy as any).name : order?.createdBy}</strong>
             </div>
           </div>
         </CardContent>
