@@ -72,7 +72,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-import * as api from "../../services/api";
+// [splinh-12/03-15:10]
 import { getNextCodeApi } from "@/services/authService";
 import {
   useUsers,
@@ -176,13 +176,7 @@ export default function UsersManagementPage() {
   const isAdmin = roleCode === "ADMIN" || roleCode === "admin";
   const isFacManager = roleCode === "FAC_MANAGER" || roleCode === "fac_manager";
 
-  const { data: factories = [] } = useQuery({
-    queryKey: ["factories"],
-    queryFn: async () => {
-      const res = await api.getFactories();
-      return res.data.data || [];
-    },
-  });
+  const { data: factories = [] } = useFactories(true); // [splinh-12/03-15:15]
 
   // Form state
   const [formData, setFormData] = useState({
@@ -225,32 +219,18 @@ export default function UsersManagementPage() {
     meta: { total: 0, active: 0, inactive: 0 },
   });
 
-  const { data: usersData, isLoading: loadingUsers } = useQuery({
-    queryKey: [
-      "users",
-      selectedFactory,
-      filterRole,
-      filterStatus,
-      pagination.page,
-      pagination.limit,
-      searchText,
-    ],
-    queryFn: async () => {
-      const res = await api.getUsers({
-        factoryId: selectedFactory !== "all" ? selectedFactory : undefined,
-        role: filterRole !== "all" ? filterRole : undefined,
-        active:
-          filterStatus === "active"
-            ? true
-            : filterStatus === "inactive"
-              ? false
-              : undefined,
-        search: searchText || undefined,
-        page: pagination.page,
-        limit: pagination.limit,
-      });
-      return res.data;
-    },
+  const { data: usersData, isLoading: loadingUsers } = useUsers({ // [splinh-12/03-15:15]
+    factoryId: selectedFactory !== "all" ? selectedFactory : undefined,
+    role: filterRole !== "all" ? filterRole : undefined,
+    active:
+      filterStatus === "active"
+        ? true
+        : filterStatus === "inactive"
+          ? false
+          : undefined,
+    search: searchText || undefined,
+    page: pagination.page,
+    limit: pagination.limit,
   });
 
   const users = usersData?.data || [];

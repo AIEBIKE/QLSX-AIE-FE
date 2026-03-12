@@ -62,9 +62,9 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import * as api from "../../services/api";
+// [splinh-12/03-15:10]
 import { useProductionOrder, useOrderProgress, useUsers, useOperations } from "@/hooks/useQueries";
-import { useCompleteOrder, useAssignWorker, useReassignRegistration, useUpdateProductionOrderStatus } from "@/hooks/useMutations";
+import { useCompleteOrder, useAssignWorker, useReassignRegistration, useUpdateProductionOrderStatus, useCheckOrderCompletion } from "@/hooks/useMutations"; // [splinh-12/03-15:15]
 import { queryKeys } from "@/hooks/queryKeys";
 
 const getProcessIcon = (processName = "") => {
@@ -153,20 +153,24 @@ export default function ProductionOrderDetailPage() {
     queryClient.invalidateQueries({ queryKey: queryKeys.productionOrders.progress(id!) });
   };
 
+  const checkCompletionMut = useCheckOrderCompletion(); // [splinh-12/03-15:15]
+
   const handleCheckCompletion = async () => {
     if (!id) return;
-    try {
-      const res = await api.checkOrderCompletion(id);
-      const checkData = res.data.data as any;
-      setCompCheck(checkData);
-      checkData.canComplete
-        ? toast.success("Có thể hoàn thành!")
-        : toast.warning(
-            `Còn ${checkData.incompleteProcesses.length} công đoạn chưa xong`,
-          );
-    } catch (e: any) {
-      toast.error(e.message);
-    }
+    checkCompletionMut.mutate(id, {
+      onSuccess: (res: any) => { // [splinh-12/03-15:18]
+        const checkData = res.data.data as any;
+        setCompCheck(checkData);
+        checkData.canComplete
+          ? toast.success("Có thể hoàn thành!")
+          : toast.warning(
+              `Còn ${checkData.incompleteProcesses.length} công đoạn chưa xong`,
+            );
+      },
+      onError: (e: any) => {
+        toast.error(e.message || "Lỗi khi kiểm tra hoàn thành");
+      }
+    });
   };
 
   const handleComplete = () => {

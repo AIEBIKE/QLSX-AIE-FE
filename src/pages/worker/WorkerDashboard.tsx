@@ -30,10 +30,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "../../contexts/AuthContext";
-import * as api from "../../services/api";
+import { useQueryClient } from "@tanstack/react-query"; // [splinh-12/03-14:36]
+import { useAuth } from "../../contexts/AuthContext"; // [splinh-12/03-14:36]
 import * as apiHooks from "../../hooks/useMutations";
+import * as queryHooks from "../../hooks/useQueries"; // [splinh-12/03-14:48]
 
 const getOperationIcon = (processName = "") => {
   const n = processName.toLowerCase();
@@ -69,27 +69,17 @@ const getIconColorClass = (processName = "") => {
 export default function WorkerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const queryClient = useQueryClient(); // [splinh-12/03-14:36]
 
-  const { data: dashboardData, isLoading: loading } = useQuery({
-    queryKey: ["workerDashboard"],
-    queryFn: async () => {
-      const [orderRes, regRes] = await Promise.all([
-        api.getCurrentOrderWithOperations(),
-        api.getTodayRegistrations(),
-      ]);
-      return {
-        orderData: orderRes.data.data as any,
-        registrations: regRes.data.data || [],
-      };
-    },
-    staleTime: 15_000,
-  });
+  const { data: orderData, isLoading: loadingOrder } = queryHooks.useCurrentOrder(); // [splinh-12/03-14:48]
+  const { data: registrations = [], isLoading: loadingReg } = queryHooks.useTodayRegistrations(); // [splinh-12/03-14:48]
 
-  const activeOrder = dashboardData?.orderData?.order || null;
-  const processes = dashboardData?.orderData?.processes || [];
-  const operations = dashboardData?.orderData?.operations || [];
-  const todayRegistrations = dashboardData?.registrations || [];
+  const loading = loadingOrder || loadingReg;
+
+  const activeOrder = (orderData as any)?.order || null; // [splinh-12/03-14:38]
+  const processes = (orderData as any)?.processes || []; // [splinh-12/03-14:38]
+  const operations = (orderData as any)?.operations || []; // [splinh-12/03-14:38]
+  const todayRegistrations = registrations || [];
   const { mutate: registerMutation, isPending: registering } = apiHooks.useRegisterOperation();
   const { mutate: cancelMutation } = apiHooks.useCancelRegistration();
   const { mutate: startMutation } = apiHooks.useStartRegistration();

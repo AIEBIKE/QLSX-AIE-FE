@@ -49,8 +49,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import * as api from "../../services/api";
+import { useQueryClient } from "@tanstack/react-query"; // [splinh-12/03-15:05]
+import * as queryHooks from "../../hooks/useQueries"; // [splinh-12/03-15:02]
 import { useAuth } from "../../contexts/AuthContext";
 import {
   useCreateProcess,
@@ -97,13 +97,8 @@ export default function ProcessManagementPage() {
   const queryClient = useQueryClient();
 
   // ─── Query: Vehicle Types ──────────────────────────
-  const { data: vehicleTypes = [], isLoading: loading } = useQuery({
-    queryKey: ["processPage_vehicleTypes"],
-    queryFn: async () => {
-      const res = await api.getVehicleTypes({ active: true });
-      return res.data.data || [];
-    },
-  });
+  const { data: vtData, isLoading: loading } = queryHooks.useVehicleTypes({ active: true }); // [splinh-12/03-15:02]
+  const vehicleTypes = (vtData as any)?.data || [];
 
   // Auto-select first vehicle type
   useEffect(() => {
@@ -113,15 +108,8 @@ export default function ProcessManagementPage() {
   }, [vehicleTypes]);
 
   // ─── Query: Processes (cascading) ──────────────────
-  const { data: processes = [] } = useQuery({
-    queryKey: ["processPage_processes", selectedVehicleType?._id],
-    queryFn: async () => {
-      const res = await api.getProcesses({
-        vehicleTypeId: selectedVehicleType._id,
-      });
-      return res.data.data || [];
-    },
-    enabled: !!selectedVehicleType,
+  const { data: processes = [] } = queryHooks.useProcesses({ // [splinh-12/03-15:02]
+    vehicleTypeId: selectedVehicleType?._id,
   });
 
   // Auto-select first process when processes change
@@ -137,13 +125,8 @@ export default function ProcessManagementPage() {
   }, [selectedVehicleType]);
 
   // ─── Query: Operations (cascading) ─────────────────
-  const { data: operations = [] } = useQuery({
-    queryKey: ["processPage_operations", selectedProcess?._id],
-    queryFn: async () => {
-      const res = await api.getOperations({ processId: selectedProcess._id });
-      return res.data.data || [];
-    },
-    enabled: !!selectedProcess,
+  const { data: operations = [] } = queryHooks.useOperations({ // [splinh-12/03-15:02]
+    processId: selectedProcess?._id 
   });
 
   // ─── Mutations ─────────────────────────────────────
@@ -347,14 +330,14 @@ export default function ProcessManagementPage() {
           <Select
             value={selectedVehicleType?._id || ""}
             onValueChange={(v) =>
-              setSelectedVehicleType(vehicleTypes.find((vt) => vt._id === v))
+              setSelectedVehicleType(vehicleTypes.find((vt: any) => vt._id === v)) // [splinh-12/03-15:06]
             }
           >
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Chọn loại xe..." />
             </SelectTrigger>
             <SelectContent>
-              {vehicleTypes.map((vt) => (
+              {vehicleTypes.map((vt: any) => ( // [splinh-12/03-15:06]
                 <SelectItem key={vt._id} value={vt._id}>
                   {vt.name} ({vt.code})
                 </SelectItem>

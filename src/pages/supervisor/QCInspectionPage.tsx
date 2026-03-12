@@ -31,14 +31,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import * as api from "../../services/api";
 import dayjs from "dayjs";
 import * as apiHooks from "../../hooks/useMutations";
+import * as queryHooks from "../../hooks/useQueries"; // [splinh-12/03-14:26]
 
 export default function QCInspectionPage() {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const navigate = useNavigate(); // [splinh-12/03-14:28]
 
   // --- Vehicle info state ---
   const [frameNumber, setFrameNumber] = useState("");
@@ -70,15 +68,7 @@ export default function QCInspectionPage() {
     roleCode === "SUPERVISOR" || roleCode === "ADMIN" || roleCode === "FAC_MANAGER";
 
   // --- Auto-load active production order ---
-  const { data: activeOrderData, isLoading: loadingOrder } = useQuery({
-    queryKey: ["activeProductionOrder"],
-    queryFn: async () => {
-      const res = await api.getActiveProductionOrder();
-      return res.data.data; // null nếu không có
-    },
-  });
-
-  const activeOrder = activeOrderData || null;
+  const { data: activeOrder, isLoading: loadingOrder } = queryHooks.useActiveProductionOrder(); // [splinh-12/03-14:26]
   const activeOrderId = activeOrder?._id || null;
 
   // --- Load operations từ loại xe của lệnh ---
@@ -88,16 +78,7 @@ export default function QCInspectionPage() {
     return vt && typeof vt === "object" ? (vt as any)._id : vt;
   }, [activeOrder]);
 
-  const { data: opsData, isLoading: loadingOps } = useQuery({
-    queryKey: ["operationsForQC", vehicleTypeId],
-    queryFn: async () => {
-      const res = await api.getOperations({ vehicleTypeId });
-      return res.data.data;
-    },
-    enabled: !!vehicleTypeId,
-  });
-
-  const operations: any[] = opsData || [];
+  const { data: operations = [], isLoading: loadingOps } = queryHooks.useOperations({ vehicleTypeId }); // [splinh-12/03-14:26]
 
   // Extract unique processes from operations
   const processes = useMemo(() => {
@@ -143,34 +124,7 @@ export default function QCInspectionPage() {
     setResults((prev) => ({ ...prev, [opId]: { ...prev[opId], note } }));
   };
 
-  const inspectMutation = useMutation({
-    mutationFn: (payload: any) => api.inspectVehicle(payload),
-    onSuccess: () => {
-      toast.success("Đã lưu phiếu kiểm duyệt!");
-      queryClient.invalidateQueries({ queryKey: ["qcList"] });
-
-      const nextIndex = autoIndex + 1;
-      setAutoIndex(nextIndex);
-
-      setFrameNumber(
-        framePrefix ? `${framePrefix}-${String(nextIndex).padStart(3, "0")}` : ""
-      );
-      setEngineNumber(
-        enginePrefix ? `${enginePrefix}-${String(nextIndex).padStart(3, "0")}` : ""
-      );
-      setColor("");
-
-      // Reset results
-      const reset: any = {};
-      operations.forEach((op: any) => {
-        reset[op._id] = { status: "pass", note: "" };
-      });
-      setResults(reset);
-    },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.error?.message || "Lỗi khi lưu phiếu");
-    },
-  });
+  const inspectMutation = apiHooks.useInspectVehicle(); // [splinh-12/03-14:26]
 
   const handleSubmit = () => {
     if (!frameNumber) {
@@ -200,7 +154,27 @@ export default function QCInspectionPage() {
         };
       }),
     };
-    inspectMutation.mutate(payload);
+    inspectMutation.mutate(payload, { // [splinh-12/03-14:26]
+      onSuccess: () => {
+        const nextIndex = autoIndex + 1;
+        setAutoIndex(nextIndex);
+
+        setFrameNumber(
+          framePrefix ? `${framePrefix}-${String(nextIndex).padStart(3, "0")}` : ""
+        );
+        setEngineNumber(
+          enginePrefix ? `${enginePrefix}-${String(nextIndex).padStart(3, "0")}` : ""
+        );
+        setColor("");
+
+        // Reset results
+        const reset: any = {};
+        operations.forEach((op: any) => {
+          reset[op._id] = { status: "pass", note: "" };
+        });
+        setResults(reset);
+      },
+    });
   };
 
   const failCount = Object.values(results).filter((r) => r.status === "fail").length;

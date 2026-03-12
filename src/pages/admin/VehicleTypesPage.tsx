@@ -169,7 +169,7 @@ export default function VehicleTypesPage() {
         <>
           {isMobile ? (
             <div className="space-y-3">
-              {vehicleTypes.map((vt) => (
+              {vehicleTypes.map((vt: any) => (
                 <Card key={vt._id} className="border-slate-200">
                   <CardContent className="pt-4">
                     <div className="flex justify-between items-start">

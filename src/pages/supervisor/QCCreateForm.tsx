@@ -13,8 +13,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import * as api from "../../services/api";
+import * as apiHooks from "../../hooks/useMutations"; // [splinh-12/03-14:34]
+import * as queryHooks from "../../hooks/useQueries"; // [splinh-12/03-14:34]
 import dayjs from "dayjs";
 
 interface QCCreateFormProps {
@@ -22,7 +22,6 @@ interface QCCreateFormProps {
 }
 
 export default function QCCreateForm({ onSuccess }: QCCreateFormProps) {
-  const queryClient = useQueryClient();
 
   const [frameNumber, setFrameNumber] = useState("");
   const [engineNumber, setEngineNumber] = useState("");
@@ -43,13 +42,7 @@ export default function QCCreateForm({ onSuccess }: QCCreateFormProps) {
   const isSupervisor = roleCode === "SUPERVISOR" || roleCode === "ADMIN" || roleCode === "FAC_MANAGER";
 
   // Load active order
-  const { data: activeOrder, isLoading: loadingOrder } = useQuery({
-    queryKey: ["activeProductionOrder"],
-    queryFn: async () => {
-      const res = await api.getActiveProductionOrder();
-      return res.data.data;
-    },
-  });
+  const { data: activeOrder, isLoading: loadingOrder } = queryHooks.useActiveProductionOrder(); // [splinh-12/03-14:34]
 
   const activeOrderId = activeOrder?._id || null;
 
@@ -59,16 +52,7 @@ export default function QCCreateForm({ onSuccess }: QCCreateFormProps) {
     return vt && typeof vt === "object" ? (vt as any)._id : vt;
   }, [activeOrder]);
 
-  const { data: opsData, isLoading: loadingOps } = useQuery({
-    queryKey: ["operationsForQC", vehicleTypeId],
-    queryFn: async () => {
-      const res = await api.getOperations({ vehicleTypeId });
-      return res.data.data;
-    },
-    enabled: !!vehicleTypeId,
-  });
-
-  const operations: any[] = opsData || [];
+  const { data: operations = [], isLoading: loadingOps } = queryHooks.useOperations({ vehicleTypeId }); // [splinh-12/03-14:34]
 
   const processes = useMemo(() => {
     const map = new Map<string, { _id: string; name: string }>();
@@ -141,28 +125,7 @@ export default function QCCreateForm({ onSuccess }: QCCreateFormProps) {
   const handleNoteChange = (opId: string, note: string) =>
     setResults((prev) => ({ ...prev, [opId]: { ...prev[opId], note } }));
 
-  const inspectMutation = useMutation({
-    mutationFn: (payload: any) => api.inspectVehicle(payload),
-    onSuccess: () => {
-      toast.success("Đã lưu phiếu kiểm duyệt!");
-      queryClient.invalidateQueries({ queryKey: ["qcList"] });
-
-      const nextIndex = autoIndex + 1;
-      setAutoIndex(nextIndex);
-      setFrameNumber(framePrefix ? `${framePrefix}-${String(nextIndex).padStart(3, "0")}` : "");
-      setEngineNumber(enginePrefix ? `${enginePrefix}-${String(nextIndex).padStart(3, "0")}` : "");
-      setColor("");
-
-      const reset: any = {};
-      operations.forEach((op: any) => { reset[op._id] = { status: "pass", note: "" }; });
-      setResults(reset);
-
-      onSuccess?.();
-    },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.error?.message || "Lỗi khi lưu phiếu");
-    },
-  });
+  const inspectMutation = apiHooks.useInspectVehicle(); // [splinh-12/03-14:34]
 
   const handleSubmit = () => {
     if (!frameNumber) { toast.error("Vui lòng nhập số khung"); return; }
@@ -186,6 +149,20 @@ export default function QCCreateForm({ onSuccess }: QCCreateFormProps) {
           note: data.note,
         };
       }),
+    }, { // [splinh-12/03-14:34]
+      onSuccess: () => {
+        const nextIndex = autoIndex + 1;
+        setAutoIndex(nextIndex);
+        setFrameNumber(framePrefix ? `${framePrefix}-${String(nextIndex).padStart(3, "0")}` : "");
+        setEngineNumber(enginePrefix ? `${enginePrefix}-${String(nextIndex).padStart(3, "0")}` : "");
+        setColor("");
+
+        const reset: any = {};
+        operations.forEach((op: any) => { reset[op._id] = { status: "pass", note: "" }; });
+        setResults(reset);
+
+        onSuccess?.();
+      }
     });
   };
 

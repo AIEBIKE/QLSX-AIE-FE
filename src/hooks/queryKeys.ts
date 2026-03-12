@@ -95,7 +95,9 @@ export const queryKeys = {
 
   // QC
   qc: {
+    list: (params?: Record<string, unknown>) => ["qc", "list", params] as const, // [splinh-12/03-14:20]
+    detail: (id: string) => ["qc", "detail", id] as const, // [splinh-12/03-14:20]
     report: (orderId: string) => ["qc", "report", orderId] as const,
-    vehicle: (frameNumber: string) => ["qc", "vehicle", frameNumber] as const,
+    vehicle: (params: Record<string, string>) => ["qc", "vehicle", params] as const, // [splinh-12/03-14:20]
   },
 } as const;

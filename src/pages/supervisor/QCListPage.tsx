@@ -59,15 +59,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import * as api from "../../services/api";
 import dayjs from "dayjs";
+import * as apiHooks from "../../hooks/useMutations"; // [splinh-12/03-14:28]
+import * as queryHooks from "../../hooks/useQueries"; // [splinh-12/03-14:28]
 import QCCreateForm from "./QCCreateForm";
 import { useAuth } from "../../contexts/AuthContext";
 
 export default function QCListPage() {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const navigate = useNavigate(); // [splinh-12/03-14:32]
   const { user } = useAuth();
 
   // Xác định role
@@ -87,15 +86,7 @@ export default function QCListPage() {
   const [page, setPage] = useState(1);
 
   // Lấy danh sách nhà máy (chỉ cần cho admin)
-  const { data: factoriesData } = useQuery({
-    queryKey: ["factoriesForQCFilter"],
-    queryFn: async () => {
-      const res = await api.getFactories();
-      return res.data.data;
-    },
-    enabled: isAdmin,
-  });
-  const factories: any[] = factoriesData || [];
+  const { data: factories = [] } = queryHooks.useFactories(isAdmin); // [splinh-12/03-14:32]
 
   // Xác định factoryId dùng để lọc lệnh SX
   // - admin: theo filterFactoryId được chọn
@@ -111,14 +102,8 @@ export default function QCListPage() {
   const ordersQueryParams: Record<string, unknown> = { limit: 200 };
   if (effectiveFactoryId) ordersQueryParams.factoryId = effectiveFactoryId;
 
-  const { data: ordersData } = useQuery({
-    queryKey: ["productionOrdersForQCFilter", effectiveFactoryId],
-    queryFn: async () => {
-      const res = await api.getProductionOrders(ordersQueryParams);
-      return res.data.data;
-    },
-  });
-  const orders: any[] = ordersData || [];
+  const { data: ordersData } = queryHooks.useProductionOrders(ordersQueryParams); // [splinh-12/03-14:32]
+  const orders: any[] = ordersData?.data || [];
 
   // Query params cho danh sách QC
   const queryParams: Record<string, unknown> = { page, limit: 20 };
@@ -130,34 +115,13 @@ export default function QCListPage() {
   // Nếu admin chọn nhà máy: lọc theo nhà máy
   if (isAdmin && filterFactoryId !== "all") queryParams.factoryId = filterFactoryId;
 
-  const { data: qcData, isLoading, refetch } = useQuery({
-    queryKey: ["qcList", queryParams],
-    queryFn: async () => {
-      const res = await api.getQCList(queryParams);
-      return res.data;
-    },
-  });
+  const { data: qcData, isLoading, refetch } = queryHooks.useQCList(queryParams); // [splinh-12/03-14:32]
 
   // Per-ticket complete (supervisor only)
-  const completeMutation = useMutation({
-    mutationFn: (id: string) => api.completeQC(id),
-    onSuccess: () => {
-      toast.success("Đã hoàn thành phiếu kiểm duyệt!");
-      queryClient.invalidateQueries({ queryKey: ["qcList"] });
-    },
-    onError: () => toast.error("Lỗi khi hoàn thành phiếu"),
-  });
+  const completeMutation = apiHooks.useCompleteQC(); // [splinh-12/03-14:32]
 
   // Complete all pending (supervisor only)
-  const completeAllMutation = useMutation({
-    mutationFn: () => api.completeAllQC(),
-    onSuccess: (res) => {
-      const count = res.data?.data?.length || 0;
-      toast.success(`Đã hoàn thành ${count} phiếu kiểm duyệt!`);
-      queryClient.invalidateQueries({ queryKey: ["qcList"] });
-    },
-    onError: () => toast.error("Lỗi khi hoàn thành tất cả phiếu"),
-  });
+  const completeAllMutation = apiHooks.useCompleteAllQC(); // [splinh-12/03-14:32]
 
   const qcList: any[] = qcData?.data || [];
   const pagination = qcData?.pagination;
@@ -262,7 +226,7 @@ export default function QCListPage() {
                   <AlertDialogFooter>
                     <AlertDialogCancel>Hủy</AlertDialogCancel>
                     <AlertDialogAction
-                      onClick={() => completeAllMutation.mutate()}
+                      onClick={() => completeAllMutation.mutate(undefined)} // [splinh-12/03-14:50]
                       className="bg-[#0077c0] hover:bg-[#005f9e]"
                     >
                       Xác nhận hoàn thành tất cả

@@ -5,11 +5,11 @@
  * Theme: AI EBIKE Orange + Blue
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useMutation } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "sonner"; // [splinh-12/03-15:05]
 import { Loader2, LogIn, Eye, EyeOff } from "lucide-react";
+import * as apiHooks from "../../hooks/useMutations"; // [splinh-12/03-15:05]
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/card";
 
 import logoAiEbike from "@/assets/logo-aiebike.png";
-import { loginApi, LoginCredentials } from "@/services/authService";
+import { LoginCredentials } from "@/services/authService"; // [splinh-12/03-15:05]
 import { useAppDispatch } from "@/store/hooks";
 import { loginSuccess } from "@/store/slices/authSlice";
 
@@ -36,9 +36,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const loginMutation = useMutation({
-    mutationFn: (credentials: LoginCredentials) => loginApi(credentials),
-    onSuccess: (data) => {
+  const loginMutation = apiHooks.useLogin(); // [splinh-12/03-15:05]
+
+  useState(() => {
+    if (loginMutation.isSuccess && loginMutation.data) {
+      const data = loginMutation.data;
       if (data.success && data.data) {
         dispatch(
           loginSuccess({
@@ -56,16 +58,56 @@ export default function LoginPage() {
           description: data.error?.message || "Có lỗi xảy ra",
         });
       }
-    },
-    onError: (error: any) => {
+    }
+  });
+
+  useState(() => {
+    if (loginMutation.isError) {
+      const error = loginMutation.error as any;
       const message =
         error.response?.data?.error?.message ||
         "Có lỗi xảy ra, vui lòng thử lại";
       toast.error("Đăng nhập thất bại", {
         description: message,
       });
-    },
+    }
   });
+
+  // Re-write login mutation handling logic to use useEffect for side effects
+  useEffect(() => {
+    if (loginMutation.isSuccess && loginMutation.data) {
+      const data = loginMutation.data;
+      if (data.success && data.data) {
+        dispatch(
+          loginSuccess({
+            user: data.data.user,
+            token: data.data.token,
+          }),
+        );
+        window.dispatchEvent(new Event("auth-changed"));
+        toast.success("Đăng nhập thành công!", {
+          description: `Chào mừng ${data.data.user.name}`,
+        });
+        navigate("/");
+      } else {
+        toast.error("Đăng nhập thất bại", {
+          description: (data as any).error?.message || "Có lỗi xảy ra",
+        });
+      }
+    }
+  }, [loginMutation.isSuccess, loginMutation.data, dispatch, navigate]);
+
+  useEffect(() => {
+    if (loginMutation.isError && loginMutation.error) {
+      const error = loginMutation.error as any;
+      const message =
+        error.response?.data?.error?.message ||
+        "Có lỗi xảy ra, vui lòng thử lại";
+      toast.error("Đăng nhập thất bại", {
+        description: message,
+      });
+    }
+  }, [loginMutation.isError, loginMutation.error]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

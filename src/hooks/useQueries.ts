@@ -9,6 +9,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "./queryKeys";
 import * as api from "../services/api";
+import { getNextCodeApi } from "../services/authService"; // [splinh-12/03-15:05]
 
 // ─── Auth & Users ────────────────────────────────────
 export const useMe = () =>
@@ -50,14 +51,19 @@ export const useUser = (id: string) =>
   });
 
 export const useUserWorkHistory = (
-  id: string,
+  id: string | undefined,
   params?: Record<string, unknown>,
-) =>
+) => // [splinh-12/03-14:48]
   useQuery({
-    queryKey: queryKeys.users.workHistory(id, params),
+    queryKey: queryKeys.users.workHistory(id || "", params),
     queryFn: async () => {
-      const res = await api.getUserWorkHistory(id, params);
-      return res.data;
+      const res = await api.getUserWorkHistory(id!, params);
+      return {
+        user: res.data.meta?.user,
+        registrations: res.data.data,
+        statistics: res.data.meta?.statistics,
+        pagination: res.data.pagination,
+      };
     },
     enabled: !!id,
   });
@@ -130,11 +136,11 @@ export const useOrderProgress = (id: string) =>
     enabled: !!id,
   });
 
-export const useOrderReport = (id: string) =>
+export const useOrderReport = (id: string | undefined) => // [splinh-12/03-14:58]
   useQuery({
-    queryKey: queryKeys.productionOrders.report(id),
+    queryKey: queryKeys.productionOrders.report(id || ""),
     queryFn: async () => {
-      const res = await api.getOrderReport(id);
+      const res = await api.getOrderReport(id!);
       return res.data.data;
     },
     enabled: !!id,
@@ -258,12 +264,30 @@ export const useQCReport = (orderId: string) =>
     enabled: !!orderId,
   });
 
-export const useQCList = (params?: Record<string, unknown>) =>
+export const useQCList = (params?: Record<string, unknown>) => // [splinh-12/03-14:21]
   useQuery({
-    queryKey: ["qcList", params],
+    queryKey: queryKeys.qc.list(params),
     queryFn: async () => {
       const res = await api.getQCList(params);
       return res.data;
     },
   });
+
+export const useQCDetail = (id: string | undefined) => // [splinh-12/03-14:21]
+  useQuery({
+    queryKey: queryKeys.qc.detail(id || ""),
+    queryFn: async () => {
+      const res = await api.getQCDetail(id!);
+      return res.data.data;
+    },
+    enabled: !!id,
+  });
+
+export const useNextCode = (role: string) => // [splinh-12/03-15:05]
+  useQuery({
+    queryKey: ["nextCode", role],
+    queryFn: () => getNextCodeApi(role),
+    enabled: !!role,
+  });
+
 

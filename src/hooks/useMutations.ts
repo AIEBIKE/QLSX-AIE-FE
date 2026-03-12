@@ -10,6 +10,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { queryKeys } from "./queryKeys";
 import * as api from "../services/api";
+import { loginApi, registerApi, LoginCredentials, RegisterData } from "../services/authService"; // [splinh-12/03-15:05]
 
 // ─── Helper: Extract error message ──────────────────
 const getErrMsg = (err: any, fallback = "Đã xảy ra lỗi"): string =>
@@ -194,6 +195,18 @@ export const useDeleteProductionStandard = () => {
       qc.invalidateQueries({ queryKey: queryKeys.productionStandards.all });
     },
     onError: (err: any) => toast.error(getErrMsg(err, "Lỗi xóa định mức")),
+  });
+};
+
+export const useBatchUpsertStandardOverrides = () => { // [splinh-12/03-14:21]
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => api.batchUpsertStandardOverrides(data),
+    onSuccess: () => {
+      toast.success("Lưu thay đổi thành công");
+      qc.invalidateQueries({ queryKey: queryKeys.productionStandards.all });
+    },
+    onError: (err: any) => toast.error(getErrMsg(err, "Lỗi lưu thay đổi")),
   });
 };
 
@@ -418,9 +431,47 @@ export const useInspectVehicle = () => {
     mutationFn: (data: any) => api.inspectVehicle(data),
     onSuccess: () => {
       toast.success("Kiểm tra thành công");
-      qc.invalidateQueries({ queryKey: ["qc"] });
+      qc.invalidateQueries({ queryKey: queryKeys.qc.list() }); // [splinh-12/03-14:21]
     },
     onError: (err: any) => toast.error(getErrMsg(err, "Lỗi kiểm tra")),
+  });
+};
+
+export const useUpdateQC = () => { // [splinh-12/03-14:21]
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.updateQC(id, data),
+    onSuccess: (_res, { id }) => {
+      toast.success("Cập nhật thành công");
+      qc.invalidateQueries({ queryKey: queryKeys.qc.list() });
+      qc.invalidateQueries({ queryKey: queryKeys.qc.detail(id) });
+    },
+    onError: (err: any) => toast.error(getErrMsg(err, "Lỗi cập nhật")),
+  });
+};
+
+export const useCompleteQC = () => { // [splinh-12/03-14:21]
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.completeQC(id),
+    onSuccess: () => {
+      toast.success("Đã hoàn thành phiếu!");
+      qc.invalidateQueries({ queryKey: queryKeys.qc.list() });
+    },
+    onError: (err: any) => toast.error(getErrMsg(err, "Lỗi hoàn thành")),
+  });
+};
+
+export const useCompleteAllQC = () => { // [splinh-12/03-14:21]
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any | undefined) => api.completeAllQC(data), // [splinh-12/03-14:48]
+    onSuccess: (res) => {
+      const count = res.data?.data?.length || 0;
+      toast.success(`Đã hoàn thành ${count} phiếu!`);
+      qc.invalidateQueries({ queryKey: queryKeys.qc.list() });
+    },
+    onError: (err: any) => toast.error(getErrMsg(err, "Lỗi hoàn thành tất cả")),
   });
 };
 
@@ -507,3 +558,17 @@ export const useDeleteOperation = () => {
       toast.error(getErrMsg(err, "Lỗi xóa thao tác")),
   });
 };
+export const useLogin = () => // [splinh-12/03-15:05]
+  useMutation({
+    mutationFn: (credentials: LoginCredentials) => loginApi(credentials),
+  });
+
+export const useRegister = () => // [splinh-12/03-15:05]
+  useMutation({
+    mutationFn: (data: RegisterData) => registerApi(data),
+  });
+
+export const useCheckOrderCompletion = () => // [splinh-12/03-15:15]
+  useMutation({
+    mutationFn: (id: string) => api.checkOrderCompletion(id),
+  });

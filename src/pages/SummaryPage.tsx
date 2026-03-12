@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
-import { getShiftSummary } from "../services/api";
+import { useAuth } from "../contexts/AuthContext"; // [splinh-12/03-15:22]
+import { useShiftSummary } from "../hooks/useQueries"; // [splinh-12/03-15:20]
 
 interface OperationSummary {
   name: string;
@@ -28,27 +28,13 @@ interface ShiftSummaryData {
 const SummaryPage = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [summary, setSummary] = useState<ShiftSummaryData | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadSummary();
-  }, []);
-
-  const loadSummary = async () => {
-    try {
-      const res = await getShiftSummary();
-      setSummary(res.data.data as ShiftSummaryData);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: summaryData, isLoading: loading } = useShiftSummary(); // [splinh-12/03-15:20]
+  const summary = summaryData as ShiftSummaryData | undefined; // [splinh-12/03-15:20]
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 to-indigo-100">
         <div className="text-xl text-blue-600 animate-pulse">Đang tải...</div>
       </div>
     );
@@ -56,7 +42,7 @@ const SummaryPage = () => {
 
   if (!summary) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 to-indigo-100">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-sm mx-4">
           <div className="text-6xl mb-4">📋</div>
           <h2 className="text-xl font-bold mb-4 text-gray-800">
@@ -77,9 +63,9 @@ const SummaryPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 pb-24">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 to-blue-50 pb-24">
       {/* Header */}
-      <header className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-4 py-6 text-center shadow-lg">
+      <header className="bg-linear-to-br from-blue-600 to-indigo-700 text-white px-4 py-6 text-center shadow-lg">
         <h1 className="text-2xl font-bold tracking-wide">
           TỔNG KẾT CA LÀM VIỆC
         </h1>
@@ -96,7 +82,7 @@ const SummaryPage = () => {
       <div className="p-4 space-y-5 max-w-lg mx-auto">
         {/* User Info Card */}
         <div className="bg-white rounded-2xl shadow-md p-5 flex items-center gap-4 border border-blue-100">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center shadow-md">
+          <div className="w-16 h-16 bg-linear-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center shadow-md">
             <svg
               className="w-8 h-8 text-white"
               fill="none"
@@ -127,7 +113,7 @@ const SummaryPage = () => {
           </h3>
 
           <div className="grid grid-cols-2 gap-3 mb-5">
-            <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+            <div className="text-center p-4 bg-linear-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
               <div className="text-3xl font-bold text-blue-600">
                 {summary.totalOperations}
               </div>
@@ -135,7 +121,7 @@ const SummaryPage = () => {
                 Thao tác hoàn thành
               </div>
             </div>
-            <div className="text-center p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100">
+            <div className="text-center p-4 bg-linear-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100">
               <div className="text-3xl font-bold text-green-600">
                 {summary.totalWorkingMinutes}
                 <span className="text-lg">p</span>
@@ -144,14 +130,14 @@ const SummaryPage = () => {
                 Thời gian thực tế
               </div>
             </div>
-            <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl border border-purple-100">
+            <div className="text-center p-4 bg-linear-to-br from-purple-50 to-violet-50 rounded-xl border border-purple-100">
               <div className="text-3xl font-bold text-purple-600">
                 {summary.totalStandardMinutes}
                 <span className="text-lg">p</span>
               </div>
               <div className="text-xs text-gray-500 mt-1">Thời gian chuẩn</div>
             </div>
-            <div className="text-center p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-100">
+            <div className="text-center p-4 bg-linear-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-100">
               <div
                 className={`text-3xl font-bold ${summary.efficiencyPercent >= 100 ? "text-green-600" : "text-amber-600"}`}
               >
@@ -164,7 +150,7 @@ const SummaryPage = () => {
 
           {/* Result Banner */}
           <div
-            className={`${resultBg[summary.result?.type || ""] || "bg-gray-500"} text-white rounded-2xl p-6 text-center shadow-lg`}
+            className={`${resultBg[(summary.result?.type as string) || ""] || "bg-gray-500"} text-white rounded-2xl p-6 text-center shadow-lg`} // [splinh-12/03-15:20]
           >
             <div className="text-3xl mb-2">
               {summary.result?.type === "bonus"
@@ -195,7 +181,7 @@ const SummaryPage = () => {
               {summary.operations.map((op, idx) => (
                 <div
                   key={idx}
-                  className="flex justify-between items-center p-3 bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl border border-gray-100"
+                  className="flex justify-between items-center p-3 bg-linear-to-br from-gray-50 to-slate-50 rounded-xl border border-gray-100"
                 >
                   <div>
                     <div className="font-medium text-gray-800">{op.name}</div>
@@ -220,7 +206,7 @@ const SummaryPage = () => {
         <div className="max-w-lg mx-auto flex gap-3">
           <button
             onClick={() => navigate("/")}
-            className="flex-1 py-3.5 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-xl shadow-md hover:from-blue-600 hover:to-indigo-700 transition-all flex items-center justify-center gap-2"
+            className="flex-1 py-3.5 px-4 bg-linear-to-br from-blue-500 to-indigo-600 text-white font-semibold rounded-xl shadow-md hover:from-blue-600 hover:to-indigo-700 transition-all flex items-center justify-center gap-2"
           >
             <span>🏠</span> Về trang chính
           </button>
