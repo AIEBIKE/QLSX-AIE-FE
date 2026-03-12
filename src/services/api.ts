@@ -142,6 +142,10 @@ export const deleteProductionStandard = (
   id: string,
 ): Promise<AxiosResponse<ApiResponse<null>>> =>
   api.delete(`/production-standards/${id}`);
+export const batchUpsertStandardOverrides = (
+  data: { overrides: Array<{ standardId: string; bonusPerUnit: number; penaltyPerUnit: number }>; factoryId?: string },
+): Promise<AxiosResponse<ApiResponse<null>>> =>
+  api.put("/production-standards/overrides/batch", data);
 
 // Processes
 export const getProcesses = (
