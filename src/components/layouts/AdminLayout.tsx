@@ -258,10 +258,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 "/admin/processes",
                 "/admin/orders",
                 "/admin/standards",
+                "/admin/qc/list", // Xem phiếu kiểm duyệt QC
                 "/admin/users", // Quản lý công nhân
               ];
-              // Có thể giữ lại các tab báo cáo nếu cần thiết, ví dụ: "/admin/registrations", "/admin/salary-summary"
-              // Nhưng theo yêu cầu rạch ròi thì hiện tại đưa vào các tab chính trước.
               return (
                 facManagerIncluded.includes(item.key) ||
                 item.key === "/admin/registrations" ||
