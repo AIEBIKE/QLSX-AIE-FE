@@ -52,6 +52,7 @@ import Cookies from "js-cookie";
 import dayjs from "dayjs";
 import { Pagination } from "@/components/shared/Pagination";
 import * as api from "../../services/api";
+import * as apiHooks from "../../hooks/useMutations";
 import { useQueryClient } from "@tanstack/react-query";
 
 const statusMap: Record<string, { label: string; className: string }> = {
@@ -143,6 +144,7 @@ export default function ProductionOrdersPage() {
   // ─── React Query: Mutations ────────────────────────
   const createMutation = useCreateProductionOrder();
   const deleteMutation = useDeleteProductionOrder();
+  const updateStatusMutation = apiHooks.useUpdateProductionOrderStatus();
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -184,14 +186,8 @@ export default function ProductionOrdersPage() {
     deleteMutation.mutate(id);
   };
 
-  const handleStartOrder = async (id: string) => {
-    try {
-      await api.updateProductionOrderStatus(id, "in_progress");
-      toast.success("Đã bắt đầu lệnh sản xuất!");
-      queryClient.invalidateQueries({ queryKey: ["productionOrders"] });
-    } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
-    }
+  const handleStartOrder = (id: string) => {
+    updateStatusMutation.mutate({ id, status: "in_progress" });
   };
 
   const resetForm = () => {

@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "../../services/api";
+import * as apiHooks from "../../hooks/useMutations";
 import { Registration } from "../../types";
 
 export default function CompleteRegistrationPage() {
@@ -21,6 +22,9 @@ export default function CompleteRegistrationPage() {
   const [actualQuantity, setActualQuantity] = useState<number | null>(null);
   const [interruptionMinutes, setInterruptionMinutes] = useState(0);
   const [interruptionNote, setInterruptionNote] = useState("");
+
+  const { mutate: submitMutation, isPending: submitting } = apiHooks.useCompleteRegistration();
+  const { mutate: startMutation } = apiHooks.useStartRegistration();
 
   const { data: registration, isLoading: loading } = useQuery<Registration | null>({
     queryKey: ["registration", id],
@@ -36,12 +40,11 @@ export default function CompleteRegistrationPage() {
         }
         // If still registered, auto-start it
         if (reg.status === "registered") {
-          try {
-            await api.startRegistration(id || "");
-            reg.status = "in_progress";
-          } catch (err: any) {
-            console.error("Auto-start failed:", err);
-          }
+          startMutation(id || "", {
+            onSuccess: () => {
+              queryClient.invalidateQueries({ queryKey: ["registration", id] });
+            }
+          });
         }
         if (reg.actualQuantity !== null && reg.actualQuantity !== undefined) {
           setActualQuantity(reg.actualQuantity);
@@ -54,27 +57,22 @@ export default function CompleteRegistrationPage() {
     enabled: !!id,
   });
 
-  const submitMutation = useMutation({
-    mutationFn: () =>
-      api.completeRegistration(id || "", {
-        quantity: actualQuantity!,
-        interruptionNote: interruptionNote || "",
-        interruptionMinutes: interruptionMinutes || 0,
-      } as any),
-    onSuccess: () => {
-      toast.success("Đã lưu thành công!");
-      queryClient.invalidateQueries({ queryKey: ["workerDashboard"] });
-      navigate("/worker");
-    },
-    onError: (err: any) => {
-      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
-    },
-  });
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (submitMutation.isPending || actualQuantity === null) return;
-    submitMutation.mutate();
+    if (submitting || actualQuantity === null) return;
+    
+    submitMutation({
+      id: id || "",
+      data: {
+        actualQuantity: actualQuantity!,
+        interruptionNote: interruptionNote || "",
+        interruptionMinutes: interruptionMinutes || 0,
+      }
+    }, {
+      onSuccess: () => {
+        navigate("/worker");
+      }
+    });
   };
 
   const calculateResult = () => {
@@ -247,10 +245,10 @@ export default function CompleteRegistrationPage() {
 
             <Button
               type="submit"
-              disabled={submitMutation.isPending || actualQuantity === null}
+              disabled={submitting || actualQuantity === null}
               className="w-full h-[50px] text-base bg-emerald-500 hover:bg-emerald-600"
             >
-              {submitMutation.isPending ? (
+              {submitting ? (
                 <Loader2 className="w-5 h-5 animate-spin mr-2" />
               ) : (
                 <CheckCircle className="w-5 h-5 mr-2" />

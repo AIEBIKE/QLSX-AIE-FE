@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../contexts/AuthContext";
 import * as api from "../../services/api";
+import * as apiHooks from "../../hooks/useMutations";
 
 const getOperationIcon = (processName = "") => {
   const n = processName.toLowerCase();
@@ -89,7 +90,10 @@ export default function WorkerDashboard() {
   const processes = dashboardData?.orderData?.processes || [];
   const operations = dashboardData?.orderData?.operations || [];
   const todayRegistrations = dashboardData?.registrations || [];
-  const [registering, setRegistering] = useState(false);
+  const { mutate: registerMutation, isPending: registering } = apiHooks.useRegisterOperation();
+  const { mutate: cancelMutation } = apiHooks.useCancelRegistration();
+  const { mutate: startMutation } = apiHooks.useStartRegistration();
+
   const [selectedProcess, setSelectedProcess] = useState("all");
   const [isOutOfTime, setIsOutOfTime] = useState(false);
 
@@ -110,38 +114,17 @@ export default function WorkerDashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  const handleRegister = async (operationId: string) => {
+  const handleRegister = (operationId: string) => {
     if (registering) return;
-    setRegistering(true);
-    try {
-      await api.registerOperation(operationId);
-      toast.success("Đăng ký thành công!");
-      queryClient.invalidateQueries({ queryKey: ["workerDashboard"] });
-    } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
-    } finally {
-      setRegistering(false);
-    }
+    registerMutation(operationId);
   };
 
-  const handleCancelRegistration = async (regId: string) => {
-    try {
-      await api.cancelRegistration(regId);
-      toast.success("Đã hủy đăng ký");
-      queryClient.invalidateQueries({ queryKey: ["workerDashboard"] });
-    } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
-    }
+  const handleCancelRegistration = (regId: string) => {
+    cancelMutation(regId);
   };
 
-  const handleStartRegistration = async (regId: string) => {
-    try {
-      await api.startRegistration(regId);
-      toast.success("Đã bắt đầu thao tác!");
-      queryClient.invalidateQueries({ queryKey: ["workerDashboard"] });
-    } catch (err: any) {
-      toast.error(err.response?.data?.error?.message || "Có lỗi xảy ra");
-    }
+  const handleStartRegistration = (regId: string) => {
+    startMutation(regId);
   };
 
   const isRegistered = (opId: string) =>

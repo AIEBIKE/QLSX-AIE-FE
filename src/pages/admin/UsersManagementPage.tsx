@@ -75,9 +75,16 @@ import {
 import * as api from "../../services/api";
 import { getNextCodeApi } from "@/services/authService";
 import {
+  useUsers,
+  usePendingUsers,
+  useFactories,
+} from "@/hooks/useQueries";
+import {
   useCreateUser,
   useUpdateUser,
   useDeleteUser,
+  useApproveUser,
+  useRejectUser,
 } from "@/hooks/useMutations";
 
 // ─── Helpers ─────────────────────────────────────────
@@ -258,14 +265,7 @@ export default function UsersManagementPage() {
     }
   }, [usersData]);
 
-  const { data: pendingUsersData, isLoading: loadingPending } = useQuery({
-    queryKey: ["pendingUsers"],
-    queryFn: async () => {
-      const res = await api.default.get("/auth/users/pending");
-      return (res.data.data || []) as UserType[];
-    },
-    enabled: !isFacManager,
-  });
+  const { data: pendingUsersData, isLoading: loadingPending } = usePendingUsers(!isFacManager);
 
   const pendingUsers = pendingUsersData || [];
 
@@ -283,38 +283,8 @@ export default function UsersManagementPage() {
     }
   }, []);
 
-  const approveMutation = useMutation({
-    mutationFn: (userId: string) =>
-      api.default.put(`/auth/users/${userId}/approve`),
-    onSuccess: () => {
-      toast.success("Đã duyệt tài khoản!");
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["pendingUsers"] });
-      queryClient.invalidateQueries({ queryKey: ["pendingUsersCount"] });
-    },
-    onError: (error: any) => {
-      toast.error(
-        "Lỗi: " + (error.response?.data?.error?.message || error.message),
-      );
-    },
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: (userId: string) =>
-      api.default.put(`/auth/users/${userId}/reject`),
-    onSuccess: () => {
-      toast.success("Đã từ chối tài khoản!");
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["pendingUsers"] });
-      queryClient.invalidateQueries({ queryKey: ["pendingUsersCount"] });
-    },
-    onError: (error: any) => {
-      toast.error(
-        "Lỗi: " + (error.response?.data?.error?.message || error.message),
-      );
-    },
-  });
-
+  const approveMutation = useApproveUser();
+  const rejectMutation = useRejectUser();
   const createUserMut = useCreateUser();
   const updateUserMut = useUpdateUser();
   const deleteUserMut = useDeleteUser();
