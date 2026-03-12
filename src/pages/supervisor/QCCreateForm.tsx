@@ -346,13 +346,13 @@ export default function QCCreateForm({ onSuccess }: QCCreateFormProps) {
                         className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
                           !isFail ? "bg-emerald-500 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
                         }`}
-                      >PASS</button>
+                      >Đạt</button>
                       <button
                         onClick={() => isSupervisor && handleStatusChange(op._id, "fail")}
                         className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
                           isFail ? "bg-red-500 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"
                         }`}
-                      >FAIL</button>
+                      >Lỗi</button>
                     </div>
                     <Input
                       placeholder="Ghi chú..."

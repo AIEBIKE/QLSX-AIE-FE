@@ -4,7 +4,7 @@ import {
   ClipboardList,
   Plus,
   Calendar,
-  Edit2,
+  Eye,
   Loader2,
   Shield,
   CheckCircle,
@@ -13,6 +13,7 @@ import {
   Filter,
   RefreshCw,
   CheckCheck,
+  Building2,
 } from "lucide-react";
 import {
   Card,
@@ -62,21 +63,72 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "../../services/api";
 import dayjs from "dayjs";
 import QCCreateForm from "./QCCreateForm";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function QCListPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  // Xác định role
+  const roleCode = (user as any)?.roleCode || (user as any)?.role || "";
+  const isAdmin = ["admin", "ADMIN"].includes(roleCode);
+  const isFacManager = ["fac_manager", "FAC_MANAGER"].includes(roleCode);
+  const isSupervisor = ["supervisor", "SUPERVISOR"].includes(roleCode);
+  // View-only: admin & fac_manager chỉ xem, không tạo/sửa/hoàn thành
+  const isViewOnly = isAdmin || isFacManager;
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [filterDate, setFilterDate] = useState("");
+  // Admin: lọc nhà máy trước, rồi lọc lệnh SX
+  const [filterFactoryId, setFilterFactoryId] = useState("all");
   const [filterOrderId, setFilterOrderId] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [page, setPage] = useState(1);
 
+  // Lấy danh sách nhà máy (chỉ cần cho admin)
+  const { data: factoriesData } = useQuery({
+    queryKey: ["factoriesForQCFilter"],
+    queryFn: async () => {
+      const res = await api.getFactories();
+      return res.data.data;
+    },
+    enabled: isAdmin,
+  });
+  const factories: any[] = factoriesData || [];
+
+  // Xác định factoryId dùng để lọc lệnh SX
+  // - admin: theo filterFactoryId được chọn
+  // - fac_manager: nhà máy mình quản lý
+  // - supervisor: không lọc theo nhà máy (backend scoping)
+  const effectiveFactoryId = isAdmin
+    ? filterFactoryId !== "all" ? filterFactoryId : undefined
+    : isFacManager
+    ? (user as any)?.factories_manage || undefined
+    : undefined;
+
+  // Lấy danh sách lệnh SX để lọc
+  const ordersQueryParams: Record<string, unknown> = { limit: 200 };
+  if (effectiveFactoryId) ordersQueryParams.factoryId = effectiveFactoryId;
+
+  const { data: ordersData } = useQuery({
+    queryKey: ["productionOrdersForQCFilter", effectiveFactoryId],
+    queryFn: async () => {
+      const res = await api.getProductionOrders(ordersQueryParams);
+      return res.data.data;
+    },
+  });
+  const orders: any[] = ordersData || [];
+
+  // Query params cho danh sách QC
   const queryParams: Record<string, unknown> = { page, limit: 20 };
   if (filterDate) queryParams.date = filterDate;
   if (filterOrderId !== "all") queryParams.productionOrderId = filterOrderId;
   if (filterStatus !== "all") queryParams.status = filterStatus;
+  // Nếu fac_manager: luôn lọc theo nhà máy mình quản lý
+  if (isFacManager && effectiveFactoryId) queryParams.factoryId = effectiveFactoryId;
+  // Nếu admin chọn nhà máy: lọc theo nhà máy
+  if (isAdmin && filterFactoryId !== "all") queryParams.factoryId = filterFactoryId;
 
   const { data: qcData, isLoading, refetch } = useQuery({
     queryKey: ["qcList", queryParams],
@@ -86,15 +138,7 @@ export default function QCListPage() {
     },
   });
 
-  const { data: ordersData } = useQuery({
-    queryKey: ["productionOrdersForQCFilter"],
-    queryFn: async () => {
-      const res = await api.getProductionOrders({ limit: 200 });
-      return res.data.data;
-    },
-  });
-
-  // Per-ticket complete
+  // Per-ticket complete (supervisor only)
   const completeMutation = useMutation({
     mutationFn: (id: string) => api.completeQC(id),
     onSuccess: () => {
@@ -104,7 +148,7 @@ export default function QCListPage() {
     onError: () => toast.error("Lỗi khi hoàn thành phiếu"),
   });
 
-  // Complete all pending
+  // Complete all pending (supervisor only)
   const completeAllMutation = useMutation({
     mutationFn: () => api.completeAllQC(),
     onSuccess: (res) => {
@@ -117,13 +161,21 @@ export default function QCListPage() {
 
   const qcList: any[] = qcData?.data || [];
   const pagination = qcData?.pagination;
-  const orders: any[] = ordersData || [];
+  const orders2: any[] = orders;
   const pendingCount = qcList.filter((q) => q.status === "pending").length;
 
   const handleReset = () => {
     setFilterDate("");
+    setFilterFactoryId("all");
     setFilterOrderId("all");
     setFilterStatus("all");
+    setPage(1);
+  };
+
+  // Reset lệnh SX khi đổi nhà máy (admin)
+  const handleFactoryChange = (v: string) => {
+    setFilterFactoryId(v);
+    setFilterOrderId("all");
     setPage(1);
   };
 
@@ -152,6 +204,15 @@ export default function QCListPage() {
     );
   };
 
+  // Điều hướng khi click icon mắt
+  const handleViewClick = (qcId: string) => {
+    if (isViewOnly) {
+      navigate(`/admin/qc/${qcId}/view`);
+    } else {
+      navigate(`/admin/qc/${qcId}/edit`);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -162,59 +223,63 @@ export default function QCListPage() {
             Phiếu kiểm duyệt QC
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Quản lý và theo dõi phiếu QC của từng xe
+            {isViewOnly
+              ? "Xem danh sách phiếu QC"
+              : "Quản lý và theo dõi phiếu QC của từng xe"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Complete all button */}
-          {pendingCount > 0 && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
-                  disabled={completeAllMutation.isPending}
-                >
-                  {completeAllMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCheck className="w-4 h-4" />
-                  )}
-                  Hoàn thành tất cả
-                  <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs ml-1">
-                    {pendingCount}
-                  </Badge>
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Hoàn thành tất cả phiếu chờ?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Có <strong>{pendingCount}</strong> phiếu đang chờ kiểm duyệt. Hệ thống sẽ tự
-                    động xác nhận kết quả <strong>Đạt / Có lỗi</strong> dựa trên nội dung đã ghi.
-                    Thao tác này không thể hoàn tác.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Hủy</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => completeAllMutation.mutate()}
-                    className="bg-[#0077c0] hover:bg-[#005f9e]"
+        {!isViewOnly && (
+          <div className="flex items-center gap-2">
+            {/* Complete all button – supervisor only */}
+            {pendingCount > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+                    disabled={completeAllMutation.isPending}
                   >
-                    Xác nhận hoàn thành tất cả
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
-          <Button
-            className="bg-[#0077c0] hover:bg-[#005f9e] gap-2"
-            onClick={() => setSheetOpen(true)}
-          >
-            <Plus className="w-4 h-4" />
-            Tạo phiếu mới
-          </Button>
-        </div>
+                    {completeAllMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCheck className="w-4 h-4" />
+                    )}
+                    Hoàn thành tất cả
+                    <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs ml-1">
+                      {pendingCount}
+                    </Badge>
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Hoàn thành tất cả phiếu chờ?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Có <strong>{pendingCount}</strong> phiếu đang chờ kiểm duyệt. Hệ thống sẽ tự
+                      động xác nhận kết quả <strong>Đạt / Có lỗi</strong> dựa trên nội dung đã ghi.
+                      Thao tác này không thể hoàn tác.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Hủy</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => completeAllMutation.mutate()}
+                      className="bg-[#0077c0] hover:bg-[#005f9e]"
+                    >
+                      Xác nhận hoàn thành tất cả
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            <Button
+              className="bg-[#0077c0] hover:bg-[#005f9e] gap-2"
+              onClick={() => setSheetOpen(true)}
+            >
+              <Plus className="w-4 h-4" />
+              Tạo phiếu mới
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Filter Card */}
@@ -227,6 +292,25 @@ export default function QCListPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Bộ lọc nhà máy – chỉ cho admin */}
+            {isAdmin && (
+              <div className="space-y-1">
+                <Label className="text-xs text-slate-500 flex items-center gap-1">
+                  <Building2 className="w-3 h-3" />
+                  Nhà máy
+                </Label>
+                <Select value={filterFactoryId} onValueChange={handleFactoryChange}>
+                  <SelectTrigger><SelectValue placeholder="Tất cả nhà máy" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả nhà máy</SelectItem>
+                    {factories.map((f: any) => (
+                      <SelectItem key={f._id} value={f._id}>{f.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-1">
               <Label className="text-xs text-slate-500">Ngày kiểm duyệt</Label>
               <div className="relative">
@@ -245,7 +329,7 @@ export default function QCListPage() {
                 <SelectTrigger><SelectValue placeholder="Tất cả lệnh SX" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tất cả lệnh SX</SelectItem>
-                  {orders.map((o: any) => (
+                  {orders2.map((o: any) => (
                     <SelectItem key={o._id} value={o._id}>{o.orderCode || o.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -299,10 +383,12 @@ export default function QCListPage() {
             <div className="text-center py-16 text-slate-400">
               <Shield className="w-10 h-10 mx-auto mb-3 text-slate-200" />
               <p>Chưa có phiếu kiểm duyệt nào</p>
-              <Button variant="outline" className="mt-4" onClick={() => setSheetOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Tạo phiếu đầu tiên
-              </Button>
+              {!isViewOnly && (
+                <Button variant="outline" className="mt-4" onClick={() => setSheetOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Tạo phiếu đầu tiên
+                </Button>
+              )}
             </div>
           ) : (
             <>
@@ -349,7 +435,8 @@ export default function QCListPage() {
                         <TableCell className="text-sm text-slate-600">{inspector?.name || "—"}</TableCell>
                         <TableCell>
                           <div className="flex justify-center items-center gap-1.5">
-                            {isPending && (
+                            {/* Nút hoàn thành – chỉ supervisor */}
+                            {!isViewOnly && isPending && (
                               <Button
                                 size="sm"
                                 className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 text-xs"
@@ -364,14 +451,15 @@ export default function QCListPage() {
                                 Hoàn thành
                               </Button>
                             )}
+                            {/* Icon mắt – xem chi tiết */}
                             <Button
                               variant="outline"
-                              size="sm"
-                              className="gap-1 h-7 px-2 text-xs"
-                              onClick={() => navigate(`/admin/qc/${qc._id}/edit`)}
+                              size="icon"
+                              className="h-7 w-7 text-slate-500 hover:text-blue-600 hover:border-blue-300"
+                              onClick={() => handleViewClick(qc._id)}
+                              title={isViewOnly ? "Xem chi tiết" : "Xem / Chỉnh sửa"}
                             >
-                              <Edit2 className="w-3 h-3" />
-                              Sửa
+                              <Eye className="w-4 h-4" />
                             </Button>
                           </div>
                         </TableCell>
@@ -401,21 +489,23 @@ export default function QCListPage() {
         </CardContent>
       </Card>
 
-      {/* Create Form Sheet */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-          <SheetHeader className="mb-4">
-            <SheetTitle className="flex items-center gap-2">
-              <Shield className="w-5 h-5 text-emerald-600" />
-              Tạo phiếu kiểm duyệt
-            </SheetTitle>
-            <SheetDescription>
-              Lưu phiếu xong sẽ tự chuyển sang xe tiếp theo
-            </SheetDescription>
-          </SheetHeader>
-          <QCCreateForm onSuccess={() => refetch()} />
-        </SheetContent>
-      </Sheet>
+      {/* Create Form Sheet – supervisor only */}
+      {!isViewOnly && (
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+            <SheetHeader className="mb-4">
+              <SheetTitle className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-emerald-600" />
+                Tạo phiếu kiểm duyệt
+              </SheetTitle>
+              <SheetDescription>
+                Lưu phiếu xong sẽ tự chuyển sang xe tiếp theo
+              </SheetDescription>
+            </SheetHeader>
+            <QCCreateForm onSuccess={() => refetch()} />
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 }

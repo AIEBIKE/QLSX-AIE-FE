@@ -44,6 +44,7 @@ import FactoryManagementPage from "./pages/admin/FactoryManagementPage";
 import QCInspectionPage from "./pages/supervisor/QCInspectionPage";
 import QCListPage from "./pages/supervisor/QCListPage";
 import QCEditPage from "./pages/supervisor/QCEditPage";
+import QCViewPage from "./pages/supervisor/QCViewPage";
 
 // Shared Pages
 import AccountPage from "./pages/shared/AccountPage";
@@ -322,6 +323,14 @@ function App() {
             element={
               <AdminRoute>
                 <QCEditPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/qc/:id/view"
+            element={
+              <AdminRoute>
+                <QCViewPage />
               </AdminRoute>
             }
           />

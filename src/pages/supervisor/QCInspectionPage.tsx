@@ -487,7 +487,7 @@ export default function QCInspectionPage() {
                                   : "text-slate-500 hover:text-slate-700"
                               } ${!isSupervisor && "cursor-not-allowed opacity-70"}`}
                             >
-                              PASS
+                              Đạt
                             </button>
                             <button
                               onClick={() =>
@@ -500,7 +500,7 @@ export default function QCInspectionPage() {
                                   : "text-slate-500 hover:text-slate-700"
                               } ${!isSupervisor && "cursor-not-allowed opacity-70"}`}
                             >
-                              FAIL
+                              Lỗi
                             </button>
                           </div>
                           <Input
