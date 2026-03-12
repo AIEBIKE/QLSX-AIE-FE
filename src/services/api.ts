@@ -142,6 +142,7 @@ export const deleteProductionStandard = (
   id: string,
 ): Promise<AxiosResponse<ApiResponse<null>>> =>
   api.delete(`/production-standards/${id}`);
+// [splinh] Batch upsert factory bonus/penalty overrides
 export const batchUpsertStandardOverrides = (
   data: { overrides: Array<{ standardId: string; bonusPerUnit: number; penaltyPerUnit: number }>; factoryId?: string },
 ): Promise<AxiosResponse<ApiResponse<null>>> =>

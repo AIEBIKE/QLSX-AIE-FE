@@ -74,6 +74,7 @@ export default function ProductionStandardsPage() {
   const isSupervisor = roleCode === "SUPERVISOR" || roleCode === "supervisor";
   const canEdit = isFacManager || isAdmin;
 
+  // [splinh] Factory dropdown cho thưởng/phạt override
   const [selectedFactory, setSelectedFactory] = useState<string>(
     user.factoryId || ""
   );
