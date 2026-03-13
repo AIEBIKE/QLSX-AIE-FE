@@ -17,7 +17,7 @@ import WorkerLayout from "./components/layouts/WorkerLayout";
 // Auth Pages (shadcn/ui)
 import {
   LoginPage,
-  RegisterPage,
+  // RegisterPage, // [minhlaoma-13/03-08:45]
   ForgotPasswordPage,
   ResetPasswordPage,
 } from "./pages/auth";
@@ -135,14 +135,14 @@ function App() {
               </GuestRoute>
             }
           />
-          <Route
+          {/* <Route
             path="/register"
             element={
               <GuestRoute>
                 <RegisterPage />
               </GuestRoute>
             }
-          />
+          /> */} // [minhlaoma-13/03-08:45]
           <Route
             path="/forgot-password"
             element={

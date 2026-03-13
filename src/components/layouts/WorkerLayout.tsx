@@ -17,7 +17,7 @@ import {
   Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -192,6 +192,9 @@ export default function WorkerLayout({ children }: WorkerLayoutProps) {
             <Avatar
               className={`${collapsed && !isMobile ? "w-8 h-8" : "w-10 h-10"} shrink-0`}
             >
+              {user?.avatar && (
+                <AvatarImage src={user.avatar} alt={user.name} />
+              )}
               <AvatarFallback className="bg-emerald-600 text-white text-sm font-semibold">
                 {getInitials(user?.name || "")}
               </AvatarFallback>
@@ -220,6 +223,9 @@ export default function WorkerLayout({ children }: WorkerLayoutProps) {
           <DropdownMenuLabel className="p-0 font-normal">
             <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
               <Avatar className="h-8 w-8 rounded-lg">
+                {user?.avatar && (
+                  <AvatarImage src={user.avatar} alt={user.name} />
+                )}
                 <AvatarFallback className="rounded-lg bg-emerald-600 text-white text-xs font-semibold">
                   {getInitials(user?.name || "")}
                 </AvatarFallback>
@@ -335,6 +341,9 @@ export default function WorkerLayout({ children }: WorkerLayoutProps) {
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
                   <Avatar className="w-9 h-9">
+                    {user?.avatar && (
+                      <AvatarImage src={user.avatar} alt={user.name} />
+                    )}
                     <AvatarFallback className="bg-emerald-600 text-white text-sm font-semibold">
                       {getInitials(user?.name || "")}
                     </AvatarFallback>
@@ -350,6 +359,9 @@ export default function WorkerLayout({ children }: WorkerLayoutProps) {
                 <DropdownMenuLabel className="p-0 font-normal">
                   <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                     <Avatar className="h-8 w-8 rounded-lg">
+                      {user?.avatar && (
+                        <AvatarImage src={user.avatar} alt={user.name} />
+                      )}
                       <AvatarFallback className="rounded-lg bg-emerald-600 text-white text-xs font-semibold">
                         {getInitials(user?.name || "")}
                       </AvatarFallback>

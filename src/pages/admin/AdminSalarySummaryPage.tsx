@@ -25,7 +25,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -63,7 +63,7 @@ const getInitials = (name: string) => {
 import { Pagination } from "@/components/shared/Pagination";
 
 interface WorkerStat {
-  user: { _id: string; code: string; name: string };
+  user: { _id: string; code: string; name: string; avatar?: string };
   totalQuantity: number;
   totalBonus: number;
   totalPenalty: number;
@@ -379,6 +379,9 @@ export default function AdminSalarySummaryPage() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <Avatar className="h-9 w-9">
+                              {w.user.avatar && (
+                                <AvatarImage src={w.user.avatar} alt={w.user.name} />
+                              )}
                               <AvatarFallback
                                 style={{
                                   backgroundColor: getAvatarColor(w.user.name),

@@ -1,7 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+/* [minhlaoma-13/03-09:35] */
+.dark {
+  color-scheme: dark;
+}
 
 /* ============================================
    DESIGN SYSTEM - Based on Stitch Mockups
@@ -727,9 +730,16 @@ body {
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: var(--border);
+    outline-color: color-mix(in srgb, var(--ring) 50%, transparent);
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+  button, 
+  [role="button"],
+  a {
+    cursor: pointer;
   }
 }

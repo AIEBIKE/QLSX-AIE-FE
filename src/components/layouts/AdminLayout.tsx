@@ -28,7 +28,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -93,11 +93,6 @@ const menuItems: MenuItem[] = [
     key: "/admin/orders",
     icon: <FileText className="w-4 h-4" />,
     label: "Lệnh sản xuất",
-  },
-  {
-    key: "/admin/registrations",
-    icon: <Wrench className="w-4 h-4" />,
-    label: "Đăng ký công",
   },
   {
     key: "/admin/qc/list",
@@ -263,7 +258,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               ];
               return (
                 facManagerIncluded.includes(item.key) ||
-                item.key === "/admin/registrations" ||
                 item.key === "/admin/salary-summary"
               );
             }
@@ -278,7 +272,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 "/admin/orders",
                 "/admin/standards",
                 "/admin/qc/list",
-                "/admin/registrations", // Thêm đăng ký công cho GS
               ];
               return supervisorIncluded.includes(item.key);
             }
@@ -327,6 +320,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             <Avatar
               className={`${collapsed && !isMobile ? "w-8 h-8" : "w-10 h-10"} shrink-0`}
             >
+              {user?.avatar && (
+                <AvatarImage src={user.avatar} alt={user.name} />
+              )}
               <AvatarFallback className="bg-[#0077c0] text-white text-sm font-semibold">
                 {getInitials(user?.name || "")}
               </AvatarFallback>
@@ -355,6 +351,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           <DropdownMenuLabel className="p-0 font-normal">
             <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
               <Avatar className="h-8 w-8 rounded-lg">
+                {user?.avatar && (
+                  <AvatarImage src={user.avatar} alt={user.name} />
+                )}
                 <AvatarFallback className="rounded-lg bg-[#0077c0] text-white text-xs font-semibold">
                   {getInitials(user?.name || "")}
                 </AvatarFallback>
@@ -651,6 +650,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
                     <Avatar className="w-9 h-9">
+                      {user?.avatar && (
+                        <AvatarImage src={user.avatar} alt={user.name} />
+                      )}
                       <AvatarFallback className="bg-[#0077c0] text-white text-sm font-semibold">
                         {getInitials(user?.name || "")}
                       </AvatarFallback>
@@ -669,6 +671,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   <DropdownMenuLabel className="p-0 font-normal">
                     <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                       <Avatar className="h-8 w-8 rounded-lg">
+                        {user?.avatar && (
+                          <AvatarImage src={user.avatar} alt={user.name} />
+                        )}
                         <AvatarFallback className="rounded-lg bg-[#0077c0] text-white text-xs font-semibold">
                           {getInitials(user?.name || "")}
                         </AvatarFallback>

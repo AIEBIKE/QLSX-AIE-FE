@@ -22,13 +22,7 @@ export interface LoginCredentials {
   password: string;
 }
 
-export interface RegisterData {
-  name: string;
-  code?: string;
-  email?: string;
-  password: string;
-  role?: "worker" | "supervisor" | "admin" | "fac_manager";
-}
+// export interface RegisterData { ... } (Removed) // [minhlaoma-13/03-08:45]
 
 export interface AuthResponse {
   success: boolean;
@@ -88,12 +82,7 @@ export const loginApi = async (
 /**
  * Đăng ký
  */
-export const registerApi = async (
-  data: RegisterData,
-): Promise<AuthResponse> => {
-  const response = await authAxios.post<AuthResponse>(`${API_URL}/register`, data);
-  return response.data;
-};
+// registerApi (Removed) // [minhlaoma-13/03-08:45]
 
 /**
  * Quên mật khẩu - gửi email reset

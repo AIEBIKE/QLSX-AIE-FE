@@ -23,6 +23,7 @@ export interface User {
   factoryId?: string; // Home factory
   factories_manage?: string; // Managed factory (for FAC_MANAGER)
   active: boolean;
+  avatar?: string; // Link avatar (Cloudinary)
   createdAt?: string;
   updatedAt?: string;
 }

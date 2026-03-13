@@ -162,7 +162,7 @@ export default function AdminDashboard() {
               • Vào <strong>Lệnh sản xuất</strong> để tạo/kích hoạt lệnh mới
             </p>
             <p>
-              • Xem <strong>Đăng ký công</strong> để theo dõi tiến độ công nhân
+              • Xem <strong>Danh sách QC</strong> để theo dõi tiến độ kiểm duyệt
             </p>
             <p>
               • Cài đặt <strong>Định mức</strong> cho thao tác mới
