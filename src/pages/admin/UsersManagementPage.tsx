@@ -29,7 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -76,15 +76,15 @@ import {
 import { getNextCodeApi } from "@/services/authService";
 import {
   useUsers,
-  usePendingUsers,
+  // usePendingUsers, // [minhlaoma-13/03-08:45]
   useFactories,
 } from "@/hooks/useQueries";
 import {
   useCreateUser,
   useUpdateUser,
   useDeleteUser,
-  useApproveUser,
-  useRejectUser,
+  // useApproveUser, // [minhlaoma-13/03-08:45]
+  // useRejectUser, // [minhlaoma-13/03-08:45]
 } from "@/hooks/useMutations";
 
 // ─── Helpers ─────────────────────────────────────────
@@ -158,6 +158,7 @@ interface UserType {
   citizenId?: string;
   address?: string;
   createdAt?: string;
+  avatar?: string;
 }
 
 // ─── Component ───────────────────────────────────────
@@ -219,7 +220,8 @@ export default function UsersManagementPage() {
     meta: { total: 0, active: 0, inactive: 0 },
   });
 
-  const { data: usersData, isLoading: loadingUsers } = useUsers({ // [splinh-12/03-15:15]
+  const { data: usersData, isLoading: loadingUsers } = useUsers({
+    // [splinh-12/03-15:15]
     factoryId: selectedFactory !== "all" ? selectedFactory : undefined,
     role: filterRole !== "all" ? filterRole : undefined,
     active:
@@ -245,11 +247,11 @@ export default function UsersManagementPage() {
     }
   }, [usersData]);
 
-  const { data: pendingUsersData, isLoading: loadingPending } = usePendingUsers(!isFacManager);
+  // const { data: pendingUsersData, isLoading: loadingPending } = usePendingUsers(!isFacManager); // [minhlaoma-13/03-08:45]
+  // const pendingUsers = pendingUsersData || []; // [minhlaoma-13/03-08:45]
+  const pendingUsers: any[] = []; // [minhlaoma-13/03-08:45]
 
-  const pendingUsers = pendingUsersData || [];
-
-  const loading = loadingUsers || loadingPending;
+  const loading = loadingUsers; // || loadingPending; // [minhlaoma-13/03-08:45]
 
   // Fetch next employee code based on role
   const fetchNextCode = useCallback(async (role: string) => {
@@ -263,19 +265,19 @@ export default function UsersManagementPage() {
     }
   }, []);
 
-  const approveMutation = useApproveUser();
-  const rejectMutation = useRejectUser();
+  // const approveMutation = useApproveUser(); // [minhlaoma-13/03-08:45]
+  // const rejectMutation = useRejectUser(); // [minhlaoma-13/03-08:45]
   const createUserMut = useCreateUser();
   const updateUserMut = useUpdateUser();
   const deleteUserMut = useDeleteUser();
 
-  const handleApprove = (userId: string) => {
-    approveMutation.mutate(userId);
-  };
+  // const handleApprove = (userId: string) => { // [minhlaoma-13/03-08:45]
+  //   approveMutation.mutate(userId);
+  // };
 
-  const handleReject = (userId: string) => {
-    rejectMutation.mutate(userId);
-  };
+  // const handleReject = (userId: string) => { // [minhlaoma-13/03-08:45]
+  //   rejectMutation.mutate(userId);
+  // };
 
   const handleSubmit = () => {
     const payload: any = {
@@ -287,7 +289,7 @@ export default function UsersManagementPage() {
       citizenId: formData.citizenId || undefined,
       address: formData.address || undefined,
     };
-    
+
     const onSuccess = () => {
       setModalOpen(false);
       resetForm();
@@ -428,150 +430,7 @@ export default function UsersManagementPage() {
             <TabsTrigger value="all" className="gap-1.5">
               <Users className="w-4 h-4" /> Tất cả ({users.length})
             </TabsTrigger>
-            {!isFacManager && (
-              <TabsTrigger value="pending" className="gap-1.5 relative">
-                <Clock className="w-4 h-4 text-amber-500" /> Chờ duyệt
-                {pendingUsers.length > 0 && (
-                  <span className="ml-1 bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5">
-                    {pendingUsers.length}
-                  </span>
-                )}
-              </TabsTrigger>
-            )}
           </TabsList>
-
-          {/* Pending tab */}
-          {!isFacManager && (
-            <TabsContent value="pending">
-              <Card className="border-slate-200">
-                <CardContent className="pt-4">
-                  {pendingUsers.length === 0 ? (
-                    <div className="text-center py-10">
-                      <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
-                      <h3 className="text-lg font-semibold text-slate-700">
-                        Không có tài khoản chờ duyệt
-                      </h3>
-                      <p className="text-slate-500 text-sm">
-                        Tất cả tài khoản đã được xử lý
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {pendingUsers.map((u) => {
-                        const roleBadge = getRoleBadge(u.role);
-                        return (
-                          <div
-                            key={u._id}
-                            className="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50"
-                          >
-                            <div className="flex items-center gap-3">
-                              <Avatar className="w-10 h-10">
-                                <AvatarFallback
-                                  style={{
-                                    backgroundColor: getAvatarColor(u.name),
-                                  }}
-                                  className="text-white text-sm font-semibold"
-                                >
-                                  {getInitials(u.name)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold text-sm">
-                                    {u.name}
-                                  </span>
-                                  <Badge variant="outline" className="text-xs">
-                                    {u.code}
-                                  </Badge>
-                                  <Badge
-                                    variant="outline"
-                                    className={`text-xs ${roleBadge.className}`}
-                                  >
-                                    {roleBadge.icon}
-                                    <span className="ml-1">
-                                      {roleBadge.label}
-                                    </span>
-                                  </Badge>
-                                </div>
-                                <p className="text-xs text-slate-500">
-                                  Đăng ký:{" "}
-                                  {u.createdAt
-                                    ? new Date(u.createdAt).toLocaleDateString(
-                                        "vi-VN",
-                                      )
-                                    : "N/A"}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    size="sm"
-                                    className="bg-emerald-500 hover:bg-emerald-600"
-                                  >
-                                    <CheckCircle className="w-3.5 h-3.5 mr-1" />{" "}
-                                    Duyệt
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      Duyệt tài khoản?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Người dùng sẽ có thể đăng nhập sau khi
-                                      được duyệt
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Hủy</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleApprove(u._id)}
-                                      className="bg-emerald-500 hover:bg-emerald-600"
-                                    >
-                                      Duyệt
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button size="sm" variant="destructive">
-                                    <XCircle className="w-3.5 h-3.5 mr-1" /> Từ
-                                    chối
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      Từ chối tài khoản?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Người dùng sẽ không thể đăng nhập
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Hủy</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleReject(u._id)}
-                                      className="bg-red-500 hover:bg-red-600"
-                                    >
-                                      Từ chối
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
 
           {/* All users tab */}
           <TabsContent value="all">
@@ -694,6 +553,9 @@ export default function UsersManagementPage() {
                             <TableCell>
                               <div className="flex items-center gap-3">
                                 <Avatar className="w-9 h-9">
+                                  {u.avatar && (
+                                    <AvatarImage src={u.avatar} alt={u.name} />
+                                  )}
                                   <AvatarFallback
                                     style={{
                                       backgroundColor: getAvatarColor(u.name),
@@ -843,6 +705,9 @@ export default function UsersManagementPage() {
                           <div className="flex gap-3">
                             <div className="relative">
                               <Avatar className="w-11 h-11">
+                                {u.avatar && (
+                                  <AvatarImage src={u.avatar} alt={u.name} />
+                                )}
                                 <AvatarFallback
                                   style={{
                                     backgroundColor: getAvatarColor(u.name),

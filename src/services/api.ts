@@ -66,6 +66,15 @@ export const changePassword = (data: {
 }): Promise<AxiosResponse<ApiResponse<null>>> =>
   api.put("/auth/change-password", data);
 
+export const uploadAvatar = (
+  formData: FormData,
+): Promise<AxiosResponse<ApiResponse<{ avatar: string }>>> =>
+  api.post("/auth/avatar", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
 // Vehicle Types
 export const getVehicleTypes = (
   params?: Record<string, unknown>,
@@ -257,8 +266,7 @@ export const assignWorkerToOrder = (
 // Users Management
 export const getUsers = (params?: Record<string, unknown>): Promise<AxiosResponse<PaginatedResponse<User>>> =>
   api.get("/auth/users", { params });
-export const getPendingUsers = (): Promise<AxiosResponse<ApiResponse<User[]>>> =>
-  api.get("/auth/users/pending");
+// getPendingUsers (Removed) // [minhlaoma-13/03-08:45]
 
 export const getUser = (
   id: string,
@@ -283,10 +291,7 @@ export const getAdminSalarySummary = (
   params?: Record<string, unknown>,
 ): Promise<AxiosResponse<PaginatedResponse<any>>> =>
   api.get("/auth/users/salary-summary", { params });
-export const approveUser = (id: string): Promise<AxiosResponse<ApiResponse<User>>> =>
-  api.put(`/auth/users/${id}/approve`);
-export const rejectUser = (id: string): Promise<AxiosResponse<ApiResponse<User>>> =>
-  api.put(`/auth/users/${id}/reject`);
+// approveUser & rejectUser (Removed) // [minhlaoma-13/03-08:45]
 
 // Shifts
 export const startShift = (): Promise<AxiosResponse<ApiResponse<Shift>>> =>

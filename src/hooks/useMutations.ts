@@ -10,7 +10,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { queryKeys } from "./queryKeys";
 import * as api from "../services/api";
-import { loginApi, registerApi, LoginCredentials, RegisterData } from "../services/authService"; // [splinh-12/03-15:05]
+import { loginApi, LoginCredentials } from "../services/authService"; // [minhlaoma-13/03-08:45]
 
 // ─── Helper: Extract error message ──────────────────
 const getErrMsg = (err: any, fallback = "Đã xảy ra lỗi"): string =>
@@ -252,31 +252,9 @@ export const useDeleteUser = () => {
   });
 };
 
-export const useApproveUser = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => api.approveUser(id),
-    onSuccess: () => {
-      toast.success("Đã phê duyệt tài khoản");
-      qc.invalidateQueries({ queryKey: queryKeys.users.all });
-      qc.invalidateQueries({ queryKey: ["pendingUsers"] });
-    },
-    onError: (err: any) => toast.error(getErrMsg(err, "Lỗi phê duyệt")),
-  });
-};
+// useApproveUser (Removed) // [minhlaoma-13/03-08:45]
 
-export const useRejectUser = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => api.rejectUser(id),
-    onSuccess: () => {
-      toast.success("Đã từ chối tài khoản");
-      qc.invalidateQueries({ queryKey: queryKeys.users.all });
-      qc.invalidateQueries({ queryKey: ["pendingUsers"] });
-    },
-    onError: (err: any) => toast.error(getErrMsg(err, "Lỗi từ chối")),
-  });
-};
+// useRejectUser (Removed) // [minhlaoma-13/03-08:45]
 
 // ─── Factories ──────────────────────────────────────
 
@@ -564,10 +542,7 @@ export const useLogin = () => // [splinh-12/03-15:05]
     mutationFn: (credentials: LoginCredentials) => loginApi(credentials),
   });
 
-export const useRegister = () => // [splinh-12/03-15:05]
-  useMutation({
-    mutationFn: (data: RegisterData) => registerApi(data),
-  });
+// useRegister (Removed) // [minhlaoma-13/03-08:45]
 
 export const useCheckOrderCompletion = () => // [splinh-12/03-15:15]
   useMutation({

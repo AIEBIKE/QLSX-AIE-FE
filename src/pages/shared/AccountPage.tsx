@@ -1,6 +1,10 @@
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useRef } from "react";
 import { useAuth } from "../../contexts/AuthContext";
-import { updateProfile, changePassword } from "../../services/api";
+import {
+  updateProfile,
+  changePassword,
+  uploadAvatar,
+} from "../../services/api";
 import {
   Card,
   CardContent,
@@ -9,9 +13,18 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import Cropper, { Area, Point } from "react-easy-crop";
+import getCroppedImg from "../../shared/utils/cropImage";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   User,
   Mail,
@@ -25,6 +38,8 @@ import {
   Save,
   Eye,
   EyeOff,
+  Camera,
+  Loader2,
 } from "lucide-react";
 
 export default function AccountPage() {
@@ -41,6 +56,17 @@ export default function AccountPage() {
   const [citizenId, setCitizenId] = useState(user?.citizenId || "");
   const [address, setAddress] = useState(user?.address || "");
   const [profileLoading, setProfileLoading] = useState(false);
+
+  // Avatar upload state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarLoading, setAvatarLoading] = useState(false);
+
+  // Image cropping state
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [isCropping, setIsCropping] = useState(false);
 
   // Password form state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -59,17 +85,97 @@ export default function AccountPage() {
     return name[0].toUpperCase();
   };
 
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Kích thước ảnh không được vượt quá 2MB");
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Vui lòng chọn định dạng ảnh hợp lệ (JPG, PNG, WebP)");
+      return;
+    }
+
+    // Instead of uploading, open cropper
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      setImageSrc(reader.result as string);
+      setIsCropping(true);
+    });
+    reader.readAsDataURL(file);
+  };
+
+  const onCropComplete = (croppedArea: Area, croppedAreaPixels: Area) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  };
+
+  const handleCropSave = async () => {
+    if (!imageSrc || !croppedAreaPixels) return;
+
+    try {
+      setAvatarLoading(true);
+      setIsCropping(false);
+
+      const croppedImage = await getCroppedImg(imageSrc, croppedAreaPixels);
+      if (!croppedImage) {
+        toast.error("Không thể xử lý ảnh đã cắt");
+        return;
+      }
+
+      // Create a unique filename
+      const filename = `avatar_${user?.code || Date.now()}.jpg`;
+      const file = new File([croppedImage], filename, { type: "image/jpeg" });
+
+      const formData = new FormData();
+      formData.append("avatar", file);
+
+      const res = await uploadAvatar(formData);
+      if (res.data.success) {
+        toast.success("Cập nhật ảnh đại diện thành công");
+        updateUser({ avatar: res.data.data.avatar });
+      }
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.error?.message || "Lỗi khi tải ảnh lên",
+      );
+    } finally {
+      setAvatarLoading(false);
+      setImageSrc(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const getRoleLabel = (role?: string) => {
-    if (role === "worker") return "Công nhân";
-    if (role === "admin") return "Quản trị viên";
-    return "Giám sát";
+    if (!role) return "Người dùng";
+    const r = role.toUpperCase();
+    if (r === "ADMIN") return "Quản trị viên";
+    if (r === "FAC_MANAGER") return "Quản lý nhà máy";
+    if (r === "SUPERVISOR") return "Giám sát (QA/QC)";
+    if (r === "WORKER") return "Công nhân";
+    return "Người dùng";
   };
 
   const getRoleBadgeColor = (role?: string) => {
-    if (role === "admin") return "bg-blue-100 text-blue-700 border-blue-200";
-    if (role === "worker")
+    if (!role) return "bg-slate-100 text-slate-700 border-slate-200";
+    const r = role.toUpperCase();
+    if (r === "ADMIN") return "bg-blue-100 text-blue-700 border-blue-200";
+    if (r === "FAC_MANAGER")
+      return "bg-indigo-100 text-indigo-700 border-indigo-200";
+    if (r === "SUPERVISOR")
+      return "bg-amber-100 text-amber-700 border-amber-200";
+    if (r === "WORKER")
       return "bg-emerald-100 text-emerald-700 border-emerald-200";
-    return "bg-amber-100 text-amber-700 border-amber-200";
+    return "bg-slate-100 text-slate-700 border-slate-200";
   };
 
   const handleProfileSubmit = async (e: FormEvent) => {
@@ -145,11 +251,38 @@ export default function AccountPage() {
       <Card className="border-0 shadow-md bg-gradient-to-r from-slate-900 to-slate-800 text-white overflow-hidden">
         <CardContent className="pt-6 pb-6">
           <div className="flex items-center gap-4">
-            <Avatar className="w-16 h-16 border-2 border-white/20">
-              <AvatarFallback className="bg-white/10 text-white text-xl font-bold">
-                {getInitials(user?.name || "")}
-              </AvatarFallback>
-            </Avatar>
+            <div
+              className="relative group/avatar cursor-pointer"
+              onClick={handleAvatarClick}
+            >
+              <Avatar className="w-16 h-16 border-2 border-white/20 shadow-lg">
+                <AvatarImage
+                  src={user?.avatar}
+                  alt={user?.name}
+                  className="object-cover"
+                />
+                <AvatarFallback className="bg-white/10 text-white text-xl font-bold">
+                  {getInitials(user?.name || "")}
+                </AvatarFallback>
+              </Avatar>
+
+              {/* Overlay edit button */}
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                {avatarLoading ? (
+                  <Loader2 className="w-5 h-5 text-white animate-spin" />
+                ) : (
+                  <Camera className="w-5 h-5 text-white" />
+                )}
+              </div>
+
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handleFileChange}
+              />
+            </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-lg font-bold truncate">{user?.name}</h2>
               <div className="flex items-center gap-2 mt-1 text-sm text-white/70">
@@ -158,10 +291,10 @@ export default function AccountPage() {
               </div>
               <div className="mt-2">
                 <span
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getRoleBadgeColor(user?.role)}`}
+                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getRoleBadgeColor(user?.roleCode)}`}
                 >
                   <Shield className="w-3 h-3" />
-                  {getRoleLabel(user?.role)}
+                  {getRoleLabel(user?.roleCode)}
                 </span>
               </div>
             </div>
@@ -281,7 +414,7 @@ export default function AccountPage() {
                   Vai trò
                 </label>
                 <div className="px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-100 text-sm text-slate-600">
-                  {getRoleLabel(user?.role)}
+                  {getRoleLabel(user?.roleCode)}
                 </div>
               </div>
             </div>
@@ -410,6 +543,67 @@ export default function AccountPage() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Image Cropping Dialog */}
+      <Dialog open={isCropping} onOpenChange={setIsCropping}>
+        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden">
+          <DialogHeader className="p-4 border-b">
+            <DialogTitle>Cắt ảnh đại diện</DialogTitle>
+          </DialogHeader>
+          <div className="relative w-full h-[400px] bg-slate-900">
+            {imageSrc && (
+              <Cropper
+                image={imageSrc}
+                crop={crop}
+                zoom={zoom}
+                aspect={1}
+                onCropChange={setCrop}
+                onCropComplete={onCropComplete}
+                onZoomChange={setZoom}
+              />
+            )}
+          </div>
+          <div className="p-4 space-y-4 bg-white">
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs font-medium text-slate-500">
+                <span>Thu phóng</span>
+                <span>{Math.round(zoom * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                value={zoom}
+                min={1}
+                max={3}
+                step={0.1}
+                aria-labelledby="Zoom"
+                onChange={(e) => setZoom(Number(e.target.value))}
+                className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+              />
+            </div>
+            <DialogFooter className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsCropping(false)}
+                className="flex-1"
+              >
+                Hủy
+              </Button>
+              <Button
+                onClick={handleCropSave}
+                disabled={avatarLoading}
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+              >
+                {avatarLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
+                Lưu
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

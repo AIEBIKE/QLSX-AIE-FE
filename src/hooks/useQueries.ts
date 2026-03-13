@@ -30,15 +30,7 @@ export const useUsers = (params?: Record<string, unknown>) =>
     },
   });
 
-export const usePendingUsers = (enabled = true) =>
-  useQuery({
-    queryKey: queryKeys.users.pending,
-    queryFn: async () => {
-      const res = await api.getPendingUsers();
-      return (res.data.data || []);
-    },
-    enabled,
-  });
+// usePendingUsers (Removed) // [minhlaoma-13/03-08:45]
 
 export const useUser = (id: string) =>
   useQuery({

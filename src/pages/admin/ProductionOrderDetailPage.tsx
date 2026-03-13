@@ -28,7 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -479,11 +479,14 @@ export default function ProductionOrderDetailPage() {
                           ) : (
                             <div className="flex items-center gap-2">
                               <Avatar className="h-7 w-7">
+                                {r.workers[0]?.avatar && (
+                                  <AvatarImage src={r.workers[0].avatar} alt={r.workers[0].name} />
+                                )}
                                 <AvatarFallback className="bg-[#0077c0] text-white text-xs">
-                                  {r.workers[0]?.charAt(0)}
+                                  {r.workers[0]?.name?.charAt(0) || "?"}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="text-sm">{r.workers[0]}</span>
+                              <span className="text-sm">{r.workers[0]?.name}</span>
                             </div>
                           )}
                         </td>
@@ -717,33 +720,31 @@ export default function ProductionOrderDetailPage() {
                                                       <tbody>
                                                         {dateRegs.map(
                                                           (reg: any) => {
-                                                            const actual =
-                                                              reg.actualQuantity ||
-                                                              0;
-                                                            const expected =
-                                                              reg.expectedQuantity ||
-                                                              0;
-                                                            const deviation =
-                                                              reg.deviation ??
-                                                              actual - expected;
+                                                            const actual = reg.actualQuantity || 0;
+                                                            const expected = reg.expectedQuantity || 0;
+                                                            const deviation = reg.deviation ?? actual - expected;
                                                             return (
                                                               <tr
                                                                 key={reg._id}
                                                                 className="border-b border-slate-100"
                                                               >
                                                                 <td className="py-1.5 font-medium text-slate-700">
-                                                                  {reg.worker
-                                                                    ?.name ||
-                                                                    reg.userId
-                                                                      ?.name}{" "}
-                                                                  <span className="text-slate-400">
-                                                                    (
-                                                                    {reg.worker
-                                                                      ?.code ||
-                                                                      reg.userId
-                                                                        ?.code}
-                                                                    )
-                                                                  </span>
+                                                                  <div className="flex items-center gap-2">
+                                                                    <Avatar className="h-6 w-6 text-[10px]">
+                                                                      {reg.worker?.avatar && (
+                                                                        <AvatarImage src={reg.worker.avatar} alt={reg.worker.name} />
+                                                                      )}
+                                                                      <AvatarFallback className="bg-[#0077c0] text-white">
+                                                                        {reg.worker?.name?.charAt(0) || "?"}
+                                                                      </AvatarFallback>
+                                                                    </Avatar>
+                                                                    <span>
+                                                                      {reg.worker?.name || reg.userId?.name}{" "}
+                                                                      <span className="text-slate-400 font-normal">
+                                                                        ({reg.worker?.code || reg.userId?.code})
+                                                                      </span>
+                                                                    </span>
+                                                                  </div>
                                                                 </td>
                                                                 <td className="py-1.5 text-center">
                                                                   {expected}
