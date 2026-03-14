@@ -66,13 +66,175 @@ const getIconColorClass = (processName = "") => {
   return "assembly";
 };
 
+const RegistrationCard = ({
+  reg,
+  onStart,
+  onCancel,
+  onComplete,
+  isSupplemental = false,
+}: {
+  reg: any;
+  onStart: (id: string) => void;
+  onCancel: (id: string) => void;
+  onComplete: (id: string) => void;
+  isSupplemental?: boolean;
+}) => {
+  return (
+    <Card
+      className={`border-slate-200 ${isSupplemental ? "border-l-4 border-l-amber-400 bg-amber-50/30" : ""}`}
+    >
+      <CardContent className="py-4">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-4">
+            <div
+              className={`w-10 h-10 rounded-lg flex items-center justify-center ${iconColorMap[getIconColorClass(reg.operationId?.processId?.name)] || "bg-blue-100 text-blue-600"}`}
+            >
+              {getOperationIcon(reg.operationId?.processId?.name)}
+            </div>
+            <div>
+              <div className="font-semibold flex items-center gap-2">
+                {reg.operationId?.name}
+                {isSupplemental && (
+                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200 text-[10px] h-4">
+                    Bổ sung
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-3 mt-1">
+                <span className="text-sm text-slate-500">
+                  Tiêu chuẩn: <strong>{reg.expectedQuantity}/ca</strong>
+                </span>
+                {reg.status === "completed" ? (
+                  reg.actualQuantity < reg.expectedQuantity ? (
+                    <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">
+                      ⚠️ Hoàn thành (Thiếu)
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+                      ✓ Hoàn thành
+                    </Badge>
+                  )
+                ) : reg.status === "in_progress" ? (
+                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">
+                    ⏱ Đang làm
+                  </Badge>
+                ) : (
+                  <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
+                    📋 Đã đăng ký
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {reg.status === "registered" ? (
+              <>
+                <Button
+                  size="sm"
+                  onClick={() => onStart(reg._id)}
+                  className="bg-emerald-500 hover:bg-emerald-600"
+                >
+                  <Play className="w-3.5 h-3.5 mr-1" /> Bắt đầu
+                </Button>
+                {!isSupplemental && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-slate-400 border-slate-200 hover:bg-slate-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Hủy đăng ký?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Hủy đăng ký thao tác này?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Không</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => onCancel(reg._id)}
+                          className="bg-red-500 hover:bg-red-600"
+                        >
+                          Hủy đăng ký
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </>
+            ) : reg.status === "in_progress" ? (
+              <>
+                <Button
+                  size="sm"
+                  onClick={() => onComplete(reg._id)}
+                  className="bg-[#0077c0] hover:bg-[#005f9e]"
+                >
+                  <CheckCircle className="w-3.5 h-3.5 mr-1" /> Nhập kết quả
+                </Button>
+                {!isSupplemental && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-slate-400 border-slate-200 hover:bg-slate-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Hủy đăng ký?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Hủy đăng ký thao tác này?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Không</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => onCancel(reg._id)}
+                          className="bg-red-500 hover:bg-red-600"
+                        >
+                          Hủy đăng ký
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </>
+            ) : (
+              <Badge
+                variant="outline"
+                className={`${
+                  reg.actualQuantity < reg.expectedQuantity
+                    ? "bg-orange-50 text-orange-700 border-orange-200"
+                    : "bg-emerald-50 text-emerald-700 border-emerald-100"
+                } px-3 py-1`}
+              >
+                SL: {reg.actualQuantity}
+              </Badge>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 export default function WorkerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient(); // [splinh-12/03-14:36]
 
-  const { data: orderData, isLoading: loadingOrder } = queryHooks.useCurrentOrder(); // [splinh-12/03-14:48]
-  const { data: registrations = [], isLoading: loadingReg } = queryHooks.useTodayRegistrations(); // [splinh-12/03-14:48]
+  const { data: orderData, isLoading: loadingOrder } =
+    queryHooks.useCurrentOrder(); // [splinh-12/03-14:48]
+  const { data: registrations = [], isLoading: loadingReg } =
+    queryHooks.useTodayRegistrations(); // [splinh-12/03-14:48]
 
   const loading = loadingOrder || loadingReg;
 
@@ -80,7 +242,15 @@ export default function WorkerDashboard() {
   const processes = (orderData as any)?.processes || []; // [splinh-12/03-14:38]
   const operations = (orderData as any)?.operations || []; // [splinh-12/03-14:38]
   const todayRegistrations = registrations || [];
-  const { mutate: registerMutation, isPending: registering } = apiHooks.useRegisterOperation();
+  const regularRegistrations = todayRegistrations.filter(
+    (r: any) => !r.isReplacement,
+  );
+  const supplementalRegistrations = todayRegistrations.filter(
+    (r: any) => r.isReplacement,
+  );
+
+  const { mutate: registerMutation, isPending: registering } =
+    apiHooks.useRegisterOperation();
   const { mutate: cancelMutation } = apiHooks.useCancelRegistration();
   const { mutate: startMutation } = apiHooks.useStartRegistration();
 
@@ -204,149 +374,60 @@ export default function WorkerDashboard() {
       {activeOrder && (
         <>
           {/* Today's Registrations */}
-          <div className="mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <h4 className="text-lg font-bold">✅ Đã đăng ký hôm nay</h4>
-              <span className="text-sm text-slate-400">
-                {todayRegistrations.length} thao tác
-              </span>
+          <div className="mb-8 space-y-8">
+            {/* Regular Registrations */}
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-lg font-bold">✅ Đã đăng ký hôm nay</h4>
+                <span className="text-sm text-slate-400">
+                  {regularRegistrations.length} thao tác
+                </span>
+              </div>
+              {regularRegistrations.length === 0 ? (
+                <Card className="border-slate-200">
+                  <CardContent className="py-10 text-center text-slate-400">
+                    Chưa đăng ký thao tác nào hôm nay
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {regularRegistrations.map((reg: any) => (
+                    <RegistrationCard
+                      key={reg._id}
+                      reg={reg}
+                      onStart={handleStartRegistration}
+                      onCancel={handleCancelRegistration}
+                      onComplete={(id) => navigate(`/worker/complete/${id}`)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-            {todayRegistrations.length === 0 ? (
-              <Card className="border-slate-200">
-                <CardContent className="py-10 text-center text-slate-400">
-                  Chưa đăng ký thao tác nào hôm nay
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {todayRegistrations.map((reg: any) => (
-                  <Card key={reg._id} className="border-slate-200">
-                    <CardContent className="py-4">
-                      <div className="flex items-center justify-between flex-wrap gap-3">
-                        <div className="flex items-center gap-4">
-                          <div
-                            className={`w-10 h-10 rounded-lg flex items-center justify-center ${iconColorMap[getIconColorClass(reg.operationId?.processId?.name)] || "bg-blue-100 text-blue-600"}`}
-                          >
-                            {getOperationIcon(reg.operationId?.processId?.name)}
-                          </div>
-                          <div>
-                            <div className="font-semibold">
-                              {reg.operationId?.name}
-                            </div>
-                            <div className="flex items-center gap-3 mt-1">
-                              <span className="text-sm text-slate-500">
-                                Tiêu chuẩn:{" "}
-                                <strong>{reg.expectedQuantity}/ca</strong>
-                              </span>
-                              {reg.status === "completed" ? (
-                                <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
-                                  ✓ Hoàn thành
-                                </Badge>
-                              ) : reg.status === "in_progress" ? (
-                                <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">
-                                  ⏱ Đang làm
-                                </Badge>
-                              ) : (
-                                <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
-                                  📋 Đã đăng ký
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          {reg.status === "registered" ? (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => handleStartRegistration(reg._id)}
-                                className="bg-emerald-500 hover:bg-emerald-600"
-                              >
-                                <Play className="w-3.5 h-3.5 mr-1" /> Bắt đầu
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button size="sm" variant="destructive">
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      Hủy đăng ký?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Hủy đăng ký thao tác này?
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Không</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() =>
-                                        handleCancelRegistration(reg._id)
-                                      }
-                                      className="bg-red-500 hover:bg-red-600"
-                                    >
-                                      Hủy đăng ký
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </>
-                          ) : reg.status === "in_progress" ? (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() =>
-                                  navigate(`/worker/complete/${reg._id}`)
-                                }
-                                className="bg-[#0077c0] hover:bg-[#005f9e]"
-                              >
-                                <CheckCircle className="w-3.5 h-3.5 mr-1" />{" "}
-                                Nhập kết quả
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button size="sm" variant="destructive">
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      Hủy đăng ký?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Hủy đăng ký thao tác này?
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Không</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() =>
-                                        handleCancelRegistration(reg._id)
-                                      }
-                                      className="bg-red-500 hover:bg-red-600"
-                                    >
-                                      Hủy đăng ký
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </>
-                          ) : (
-                            <Badge
-                              variant="outline"
-                              className="bg-emerald-50 text-emerald-700 px-3 py-1"
-                            >
-                              SL: {reg.actualQuantity}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+
+            {/* Supplemental Registrations */}
+            {supplementalRegistrations.length > 0 && (
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="text-lg font-bold text-amber-600 flex items-center gap-2">
+                    <Zap className="w-5 h-5 fill-amber-500 text-amber-500" />
+                    Được đăng ký bổ sung
+                  </h4>
+                  <span className="text-sm text-slate-400">
+                    {supplementalRegistrations.length} thao tác
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  {supplementalRegistrations.map((reg: any) => (
+                    <RegistrationCard
+                      key={reg._id}
+                      reg={reg}
+                      onStart={handleStartRegistration}
+                      onCancel={handleCancelRegistration}
+                      onComplete={(id) => navigate(`/worker/complete/${id}`)}
+                      isSupplemental
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>

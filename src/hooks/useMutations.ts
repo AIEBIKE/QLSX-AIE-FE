@@ -332,6 +332,8 @@ export const useCancelRegistration = () => {
       toast.success("Đã hủy đăng ký");
       qc.invalidateQueries({ queryKey: queryKeys.registrations.all });
       qc.invalidateQueries({ queryKey: ["workerDashboard"] });
+      // Invalidate specifically for ProductionOrderDetail refresh
+      qc.invalidateQueries({ queryKey: queryKeys.productionOrders.all });
     },
     onError: (err: any) => toast.error(getErrMsg(err, "Lỗi hủy đăng ký")),
   });
