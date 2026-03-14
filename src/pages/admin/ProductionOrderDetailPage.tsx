@@ -22,6 +22,7 @@ import {
   Loader2,
   ChevronDown,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,8 +64,20 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 // [splinh-12/03-15:10]
-import { useProductionOrder, useOrderProgress, useUsers, useOperations } from "@/hooks/useQueries";
-import { useCompleteOrder, useAssignWorker, useReassignRegistration, useUpdateProductionOrderStatus, useCheckOrderCompletion } from "@/hooks/useMutations"; // [splinh-12/03-15:15]
+import {
+  useProductionOrder,
+  useOrderProgress,
+  useUsers,
+  useOperations,
+} from "@/hooks/useQueries";
+import {
+  useCompleteOrder,
+  useAssignWorker,
+  useReassignRegistration,
+  useUpdateProductionOrderStatus,
+  useCheckOrderCompletion,
+  useCancelRegistration,
+} from "@/hooks/useMutations"; // [splinh-12/03-15:15]
 import { queryKeys } from "@/hooks/queryKeys";
 
 const getProcessIcon = (processName = "") => {
@@ -113,7 +126,9 @@ export default function ProductionOrderDetailPage() {
 
   // ─── React Query: Fetch data ───────────────────────
   const { data: order, isLoading: orderLoading } = useProductionOrder(id!);
-  const { data: progressData, isLoading: progressLoading } = useOrderProgress(id!);
+  const { data: progressData, isLoading: progressLoading } = useOrderProgress(
+    id!,
+  );
   const { data: usersData } = useUsers();
   const { data: opsData } = useOperations();
 
@@ -139,6 +154,7 @@ export default function ProductionOrderDetailPage() {
   const [expandedSubOp, setExpandedSubOp] = useState<string | null>(null);
   const [reassignOpen, setReassignOpen] = useState(false);
   const [selectedReg, setSelectedReg] = useState<any>(null);
+  const cancelMutation = useCancelRegistration();
   const [reassignUserId, setReassignUserId] = useState("");
   const [assignForm, setAssignForm] = useState({
     userId: "",
@@ -149,8 +165,12 @@ export default function ProductionOrderDetailPage() {
 
   // ─── Handlers ──────────────────────────────────────
   const refreshAll = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.productionOrders.detail(id!) });
-    queryClient.invalidateQueries({ queryKey: queryKeys.productionOrders.progress(id!) });
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.productionOrders.detail(id!),
+    });
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.productionOrders.progress(id!),
+    });
   };
 
   const checkCompletionMut = useCheckOrderCompletion(); // [splinh-12/03-15:15]
@@ -158,7 +178,8 @@ export default function ProductionOrderDetailPage() {
   const handleCheckCompletion = async () => {
     if (!id) return;
     checkCompletionMut.mutate(id, {
-      onSuccess: (res: any) => { // [splinh-12/03-15:18]
+      onSuccess: (res: any) => {
+        // [splinh-12/03-15:18]
         const checkData = res.data.data as any;
         setCompCheck(checkData);
         checkData.canComplete
@@ -169,7 +190,7 @@ export default function ProductionOrderDetailPage() {
       },
       onError: (e: any) => {
         toast.error(e.message || "Lỗi khi kiểm tra hoàn thành");
-      }
+      },
     });
   };
 
@@ -252,7 +273,10 @@ export default function ProductionOrderDetailPage() {
       </div>
     );
 
-  const totalW = progress.reduce((s: number, p: any) => s + p.workers.length, 0);
+  const totalW = progress.reduce(
+    (s: number, p: any) => s + p.workers.length,
+    0,
+  );
   const done = progress.reduce((s: number, p: any) => s + p.completed, 0);
   const pct = summary?.overallPercentage || 0;
 
@@ -284,13 +308,23 @@ export default function ProductionOrderDetailPage() {
                 <h2 className="text-2xl font-bold">Lệnh #{order?.orderCode}</h2>
                 <Badge
                   variant="outline"
-                  className={order?.status ? statusMap[order.status]?.cls || "" : ""}
+                  className={
+                    order?.status ? statusMap[order.status]?.cls || "" : ""
+                  }
                 >
-                  {order?.status ? statusMap[order.status]?.label || order.status : ""}
+                  {order?.status
+                    ? statusMap[order.status]?.label || order.status
+                    : ""}
                 </Badge>
               </div>
               <p className="text-sm text-slate-500">
-                {typeof order?.vehicleTypeId === "object" ? order.vehicleTypeId.name : (order?.vehicleType as any)?.name} • {typeof order?.vehicleTypeId === "object" ? order.vehicleTypeId.code : (order?.vehicleType as any)?.code}
+                {typeof order?.vehicleTypeId === "object"
+                  ? order.vehicleTypeId.name
+                  : (order?.vehicleType as any)?.name}{" "}
+                •{" "}
+                {typeof order?.vehicleTypeId === "object"
+                  ? order.vehicleTypeId.code
+                  : (order?.vehicleType as any)?.code}
                 {order?.factoryId && (
                   <span className="block text-[#0077c0] font-medium mt-1">
                     🏭 Nhà máy:{" "}
@@ -389,14 +423,14 @@ export default function ProductionOrderDetailPage() {
         <CardContent className="pt-6">
           <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
             <h3 className="text-lg font-bold">Tiến độ công đoạn</h3>
-            {canEdit && (order as any)?.status === "in_progress" && (
+            {/* {canEdit && (order as any)?.status === "in_progress" && (
               <Button
                 onClick={() => setAssignOpen(true)}
                 className="bg-[#0077c0] hover:bg-[#005fa3]"
               >
                 <UserPlus className="w-4 h-4 mr-1" /> Bổ sung CN
               </Button>
-            )}
+            )} */}
           </div>
           {compCheck && !compCheck.canComplete && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex items-start gap-2 text-sm">
@@ -480,13 +514,18 @@ export default function ProductionOrderDetailPage() {
                             <div className="flex items-center gap-2">
                               <Avatar className="h-7 w-7">
                                 {r.workers[0]?.avatar && (
-                                  <AvatarImage src={r.workers[0].avatar} alt={r.workers[0].name} />
+                                  <AvatarImage
+                                    src={r.workers[0].avatar}
+                                    alt={r.workers[0].name}
+                                  />
                                 )}
                                 <AvatarFallback className="bg-[#0077c0] text-white text-xs">
                                   {r.workers[0]?.name?.charAt(0) || "?"}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="text-sm">{r.workers[0]?.name}</span>
+                              <span className="text-sm">
+                                {r.workers[0]?.name}
+                              </span>
                             </div>
                           )}
                         </td>
@@ -603,6 +642,80 @@ export default function ProductionOrderDetailPage() {
                                             {order?.quantity || 0} SP
                                           </span>
                                         </button>
+                                        {(canEdit || isAdmin) &&
+                                          order?.status !== "completed" && (
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              disabled={
+                                                regs.some(
+                                                  (rg: any) =>
+                                                    rg.status === "in_progress",
+                                                ) ||
+                                                regs.some(
+                                                  (rg: any) =>
+                                                    rg.status === "registered",
+                                                ) ||
+                                                totalActual >=
+                                                  (order?.quantity || 0)
+                                              }
+                                              className="h-7 px-2.5 text-[11px] text-[#0077c0] border-[#0077c0]/30 hover:bg-blue-50 disabled:opacity-50 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200"
+                                              onClick={async (e) => {
+                                                e.stopPropagation();
+                                                const actualOpId =
+                                                  regs[0]?.operation?._id ||
+                                                  regs[0]?.operationId ||
+                                                  savedOpId ||
+                                                  "";
+                                                const totalExp =
+                                                  order?.quantity || 0;
+                                                const totalDone = regs.reduce(
+                                                  (s: number, rg: any) =>
+                                                    s +
+                                                    (rg.actualQuantity || 0),
+                                                  0,
+                                                );
+                                                const remaining = Math.max(
+                                                  totalExp - totalDone,
+                                                  1,
+                                                );
+
+                                                setAssignForm({
+                                                  userId: "",
+                                                  operationId:
+                                                    actualOpId.toString(),
+                                                  expectedQuantity: remaining,
+                                                  replacementReason: "",
+                                                });
+                                                setAssignOpen(true);
+                                              }}
+                                            >
+                                              {(() => {
+                                                if (
+                                                  regs.some(
+                                                    (rg: any) =>
+                                                      rg.status ===
+                                                      "in_progress",
+                                                  )
+                                                )
+                                                  return "⚠️ Đang làm";
+                                                if (
+                                                  regs.some(
+                                                    (rg: any) =>
+                                                      rg.status ===
+                                                      "registered",
+                                                  )
+                                                )
+                                                  return "⏳ Đã ĐK";
+                                                if (
+                                                  totalActual >=
+                                                  (order?.quantity || 0)
+                                                )
+                                                  return "✅ Xong";
+                                                return "+ Bổ sung";
+                                              })()}
+                                            </Button>
+                                          )}
                                       </div>
 
                                       {/* Expanded content */}
@@ -634,62 +747,6 @@ export default function ProductionOrderDetailPage() {
                                                       <span className="text-xs font-semibold text-slate-600">
                                                         📅 {dateStr}
                                                       </span>
-                                                      {(canEdit || isAdmin) &&
-                                                        order?.status !==
-                                                          "completed" && (
-                                                          <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="h-6 px-2.5 text-[11px] text-[#0077c0] border-[#0077c0]/30 hover:bg-blue-50"
-                                                            onClick={async (
-                                                              e,
-                                                            ) => {
-                                                              e.stopPropagation();
-                                                              const actualOpId =
-                                                                regs[0]
-                                                                  ?.operation
-                                                                  ?._id ||
-                                                                regs[0]
-                                                                  ?.operationId ||
-                                                                savedOpId ||
-                                                                "";
-                                                              const totalExp =
-                                                                order?.quantity ||
-                                                                0;
-                                                              const totalDone =
-                                                                regs.reduce(
-                                                                  (
-                                                                    s: number,
-                                                                    rg: any,
-                                                                  ) =>
-                                                                    s +
-                                                                    (rg.actualQuantity ||
-                                                                      0),
-                                                                  0,
-                                                                );
-                                                              const remaining =
-                                                                Math.max(
-                                                                  totalExp -
-                                                                    totalDone,
-                                                                  1,
-                                                                );
-                                                              setAssignForm({
-                                                                userId: "",
-                                                                operationId:
-                                                                  actualOpId.toString(),
-                                                                expectedQuantity:
-                                                                  remaining,
-                                                                replacementReason:
-                                                                  "",
-                                                              });
-                                                              setAssignOpen(
-                                                                true,
-                                                              );
-                                                            }}
-                                                          >
-                                                            + Bổ sung
-                                                          </Button>
-                                                        )}
                                                     </div>
                                                     <table className="w-full text-xs">
                                                       <thead>
@@ -715,14 +772,26 @@ export default function ProductionOrderDetailPage() {
                                                           <th className="py-1.5 font-medium">
                                                             Lý do
                                                           </th>
+                                                          {(canEdit ||
+                                                            isAdmin) && (
+                                                            <th className="py-1.5 font-medium text-right">
+                                                              TC
+                                                            </th>
+                                                          )}
                                                         </tr>
                                                       </thead>
                                                       <tbody>
                                                         {dateRegs.map(
                                                           (reg: any) => {
-                                                            const actual = reg.actualQuantity || 0;
-                                                            const expected = reg.expectedQuantity || 0;
-                                                            const deviation = reg.deviation ?? actual - expected;
+                                                            const actual =
+                                                              reg.actualQuantity ||
+                                                              0;
+                                                            const expected =
+                                                              reg.expectedQuantity ||
+                                                              0;
+                                                            const deviation =
+                                                              reg.deviation ??
+                                                              actual - expected;
                                                             return (
                                                               <tr
                                                                 key={reg._id}
@@ -731,17 +800,45 @@ export default function ProductionOrderDetailPage() {
                                                                 <td className="py-1.5 font-medium text-slate-700">
                                                                   <div className="flex items-center gap-2">
                                                                     <Avatar className="h-6 w-6 text-[10px]">
-                                                                      {reg.worker?.avatar && (
-                                                                        <AvatarImage src={reg.worker.avatar} alt={reg.worker.name} />
+                                                                      {reg
+                                                                        .worker
+                                                                        ?.avatar && (
+                                                                        <AvatarImage
+                                                                          src={
+                                                                            reg
+                                                                              .worker
+                                                                              .avatar
+                                                                          }
+                                                                          alt={
+                                                                            reg
+                                                                              .worker
+                                                                              .name
+                                                                          }
+                                                                        />
                                                                       )}
                                                                       <AvatarFallback className="bg-[#0077c0] text-white">
-                                                                        {reg.worker?.name?.charAt(0) || "?"}
+                                                                        {reg.worker?.name?.charAt(
+                                                                          0,
+                                                                        ) ||
+                                                                          "?"}
                                                                       </AvatarFallback>
                                                                     </Avatar>
                                                                     <span>
-                                                                      {reg.worker?.name || reg.userId?.name}{" "}
+                                                                      {reg
+                                                                        .worker
+                                                                        ?.name ||
+                                                                        reg
+                                                                          .userId
+                                                                          ?.name}{" "}
                                                                       <span className="text-slate-400 font-normal">
-                                                                        ({reg.worker?.code || reg.userId?.code})
+                                                                        (
+                                                                        {reg
+                                                                          .worker
+                                                                          ?.code ||
+                                                                          reg
+                                                                            .userId
+                                                                            ?.code}
+                                                                        )
                                                                       </span>
                                                                     </span>
                                                                   </div>
@@ -828,6 +925,90 @@ export default function ProductionOrderDetailPage() {
                                                                     reg.replacementReason ||
                                                                     "—"}
                                                                 </td>
+                                                                {(canEdit ||
+                                                                  isAdmin) && (
+                                                                  <td className="py-1.5 text-right">
+                                                                    {reg.isReplacement &&
+                                                                      (reg.status ===
+                                                                        "registered" ||
+                                                                        reg.status ===
+                                                                          "in_progress") && (
+                                                                        <AlertDialog>
+                                                                          <AlertDialogTrigger
+                                                                            asChild
+                                                                          >
+                                                                            <Button
+                                                                              variant="ghost"
+                                                                              size="icon"
+                                                                              className="h-6 w-6 text-slate-400 hover:text-red-500"
+                                                                              disabled={
+                                                                                reg.status ===
+                                                                                "in_progress"
+                                                                              } // Disable if already started as requested
+                                                                            >
+                                                                              <Trash2 className="w-3.5 h-3.5" />
+                                                                            </Button>
+                                                                          </AlertDialogTrigger>
+                                                                          <AlertDialogContent>
+                                                                            <AlertDialogHeader>
+                                                                              <AlertDialogTitle>
+                                                                                Hủy
+                                                                                lượt
+                                                                                bổ
+                                                                                sung
+                                                                                này?
+                                                                              </AlertDialogTitle>
+                                                                              <AlertDialogDescription>
+                                                                                Xác
+                                                                                nhận
+                                                                                hủy
+                                                                                lượt
+                                                                                bổ
+                                                                                sung
+                                                                                của
+                                                                                công
+                                                                                nhân{" "}
+                                                                                <strong>
+                                                                                  {reg
+                                                                                    .worker
+                                                                                    ?.name ||
+                                                                                    reg
+                                                                                      .userId
+                                                                                      ?.name}
+                                                                                </strong>
+
+                                                                                ?
+                                                                              </AlertDialogDescription>
+                                                                            </AlertDialogHeader>
+                                                                            <AlertDialogFooter>
+                                                                              <AlertDialogCancel>
+                                                                                Bỏ
+                                                                                qua
+                                                                              </AlertDialogCancel>
+                                                                              <AlertDialogAction
+                                                                                className="bg-red-500 hover:bg-red-600"
+                                                                                onClick={() => {
+                                                                                  cancelMutation.mutate(
+                                                                                    reg._id,
+                                                                                    {
+                                                                                      onSuccess:
+                                                                                        () => {
+                                                                                          refreshAll();
+                                                                                        },
+                                                                                    },
+                                                                                  );
+                                                                                }}
+                                                                              >
+                                                                                Xác
+                                                                                nhận
+                                                                                hủy
+                                                                              </AlertDialogAction>
+                                                                            </AlertDialogFooter>
+                                                                          </AlertDialogContent>
+                                                                        </AlertDialog>
+                                                                      )}
+                                                                  </td>
+                                                                )}
                                                               </tr>
                                                             );
                                                           },
@@ -885,10 +1066,15 @@ export default function ProductionOrderDetailPage() {
                         disabled={updateStatusMutation.isPending}
                         onClick={() => {
                           if (!id) return;
-                          updateStatusMutation.mutate({ id, status: "in_progress" });
+                          updateStatusMutation.mutate({
+                            id,
+                            status: "in_progress",
+                          });
                         }}
                       >
-                        {updateStatusMutation.isPending ? "Đang xử lý..." : "Bắt đầu"}
+                        {updateStatusMutation.isPending
+                          ? "Đang xử lý..."
+                          : "Bắt đầu"}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
